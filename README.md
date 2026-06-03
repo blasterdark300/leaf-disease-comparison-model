@@ -1,10 +1,16 @@
 # 🍃 Leaf Disease Comparison Model
-### A Comparative Analysis of Custom CNN, MobileNetV2, and InceptionV3 for Multi-Plant Leaf Disease Identification
 
+[![Streamlit App](https://img.shields.io/badge/Streamlit-Live_App-brightgreen?logo=streamlit)](https://leaf-disease-comparison-model.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange.svg)
 ![Framework](https://img.shields.io/badge/Framework-Keras-red.svg)
 ![GitHub License](https://img.shields.io/github/license/blasterdark300/leaf-disease-comparison-model)
+
+### A Comparative Analysis of Custom CNN, MobileNetV2, and InceptionV3 for Multi-Plant Leaf Disease Identification
+
+> **🔗 Akses Aplikasi Web:** [Klik di sini untuk mencoba Deteksi Penyakit Daun secara Real-time](https://leaf-disease-comparison-model.streamlit.app/)
+
+---
 
 ## 📌 Project Overview
 Proyek ini merupakan penelitian komparatif untuk mengidentifikasi berbagai jenis penyakit tanaman berdasarkan citra daun. Mengingat sektor pertanian adalah pilar ekonomi yang vital, deteksi penyakit secara dini sangat krusial. Penelitian ini membandingkan tiga arsitektur *Deep Learning* untuk menemukan keseimbangan terbaik antara akurasi dan efisiensi komputasi:
@@ -20,25 +26,26 @@ Proyek ini merupakan penelitian komparatif untuk mengidentifikasi berbagai jenis
 ### 1. Custom CNN (Robust Model)
 Arsitektur ini terdiri dari 4 blok utama ekstraksi fitur dengan *Learning Rate* 0.0002 untuk menjaga stabilitas di awal pelatihan.
 
-
 ### 2. MobileNetV2 (Lightweight Model)
 Menggunakan teknik *Transfer Learning* dan *Fine-Tuning* untuk efisiensi tinggi pada perangkat dengan spesifikasi rendah.
 
-
 ### 3. InceptionV3 (Complex Model)
 Memanfaatkan kedalaman jaringan untuk menangkap detail penyakit yang sangat halus pada daun tanaman.
-
 
 ---
 
 ## 📂 Repository Structure
 ```text
 .
-├── Custom_CNN.ipynb         # Notebook untuk pelatihan Custom CNN
-├── InceptionV3.ipynb        # Notebook untuk pelatihan InceptionV3
+├── app.py                  # Aplikasi Streamlit (UI & Prediksi)
+├── requirements.txt        # Dependensi sistem
+├── runtime.txt             # Konfigurasi Python 3.10
+├── Custom_CNN.ipynb        # Notebook untuk pelatihan Custom CNN
+├── InceptionV3.ipynb       # Notebook untuk pelatihan InceptionV3
 ├── MobileNetV2.ipynb       # Notebook untuk pelatihan MobileNetV2
 ├── output/                 # Folder hasil analisis
 │   ├── models/             # File model (.h5 & .keras via Git LFS)
+│   ├── labels/             # File JSON pemetaan kelas
 │   ├── logs/               # Log pelatihan
 │   └── plots/              # Grafik Akurasi & Loss
 └── .gitattributes          # Konfigurasi Git LFS
