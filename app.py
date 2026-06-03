@@ -21,7 +21,6 @@ def get_model_list():
     response = requests.get(api_url)
     if response.status_code == 200:
         files = response.json()
-        # Filter hanya file .h5 dan .keras
         return [f['name'] for f in files if f['name'].endswith(('.h5', '.keras'))]
     return []
 
@@ -34,7 +33,8 @@ def load_model(filename):
         response = requests.get(url)
         with open(local_path, "wb") as f:
             f.write(response.content)
-    return tf.keras.models.load_model(local_path)
+    # compile=False ditambahkan agar lebih kompatibel saat load di cloud
+    return tf.keras.models.load_model(local_path, compile=False)
 
 @st.cache_data
 def get_labels():
@@ -61,11 +61,11 @@ with tab1:
     if camera_file: image = Image.open(camera_file)
 
 with tab2:
-    uploaded = st.file_uploader("Pilih gambar", type=["jpg", "png"])
+    uploaded = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
     if uploaded: image = Image.open(uploaded)
 
 if image:
-    st.image(image, use_container_width=True)
+    st.image(image, caption="Gambar yang dianalisis")
     if st.button("Analisis"):
         # Preprocessing 256x256
         img = image.convert('RGB').resize((256, 256))
