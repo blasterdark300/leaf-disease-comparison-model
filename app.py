@@ -118,7 +118,7 @@ if menu == "Deteksi Penyakit":
                 
                 for i, key in enumerate(selected_models):
                     with cols[i]:
-                        with st.spinner(f"Memproses {key.split('/')[1]}..."):
+                        with st.spinner(f"Memproses..."):
                             model = load_model(batch_models[key])
                             img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
                             img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
@@ -128,9 +128,12 @@ if menu == "Deteksi Penyakit":
                             st.write(f"Model: {key.split('/')[1]}")
                             st.success(f"Hasil: **{label}**")
                             
-                            # Opsi Benar/Salah (Tanpa 'Belum')
-                            val = st.radio(f"Validasi {key}", ["Benar", "Salah"], key=f"radio_{key}")
-                            st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}", on_click=simpan_hasil, args=(key, label, val))
+                            # MENGGUNAKAN FORM AGAR PILIHAN TIDAK HILANG
+                            with st.form(key=f"form_{key}"):
+                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True)
+                                submit = st.form_submit_button("Simpan Hasil")
+                                if submit:
+                                    simpan_hasil(key, label, val)
 
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
