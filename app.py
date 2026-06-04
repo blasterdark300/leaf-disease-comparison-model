@@ -43,6 +43,14 @@ def load_model(path_in_repo):
             f.write(response.content)
     return tf.keras.models.load_model(local_filename, compile=False)
 
+def load_image_from_url(url):
+    try:
+        response = requests.get(url, stream=True)
+        return Image.open(response.raw)
+    except:
+        st.error("Gagal memuat gambar dari URL tersebut.")
+        return None
+
 # --- SIDEBAR ---
 menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
 
@@ -53,15 +61,18 @@ if menu == "Deteksi Penyakit":
     available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
     selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
     
-    # Input Gambar (Kamera & Upload)
-    tab1, tab2 = st.tabs(["📸 Kamera", "📂 Upload File"])
+    tab1, tab2, tab3 = st.tabs(["📸 Kamera", "📂 Upload File", "🔗 Link URL"])
     image = None
+    
     with tab1:
-        camera_file = st.camera_input("Ambil foto daun")
+        camera_file = st.camera_input("Ambil foto")
         if camera_file: image = Image.open(camera_file)
     with tab2:
-        uploaded_file = st.file_uploader("Pilih gambar dari perangkat", type=["jpg", "png", "jpeg"])
+        uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
         if uploaded_file: image = Image.open(uploaded_file)
+    with tab3:
+        url_input = st.text_input("Masukkan link URL gambar (.jpg/.png):")
+        if url_input: image = load_image_from_url(url_input)
     
     if image:
         st.image(image, caption="Gambar yang dianalisis", width=300)
@@ -86,9 +97,9 @@ if menu == "Deteksi Penyakit":
                     if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
                         if 'history' not in st.session_state: st.session_state.history = []
                         st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-                        st.success("Tersimpan!")
+                        st.balloons()
 
-# --- HALAMAN LAINNYA ---
+# --- ROUTING LAINNYA ---
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
 elif menu == "Informasi":
