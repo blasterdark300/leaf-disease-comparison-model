@@ -5,7 +5,8 @@ from PIL import Image
 import requests
 import pandas as pd
 import os
-import hasil_penelitian # Memanggil file modular
+import hasil_penelitian
+import informasi  # Pastikan Anda sudah membuat file informasi.py
 
 # --- KONFIGURASI ---
 st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout="wide")
@@ -53,37 +54,53 @@ if menu == "Deteksi Penyakit":
     available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
     selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
     
+    # Inisialisasi state gambar
+    if 'img_to_analyze' not in st.session_state: st.session_state.img_to_analyze = None
+    
     tab1, tab2 = st.tabs(["📸 Kamera", "📂 Galeri"])
-    image = None
     with tab1:
         camera_file = st.camera_input("Ambil foto")
-        if camera_file: image = Image.open(camera_file)
+        if camera_file: st.session_state.img_to_analyze = Image.open(camera_file)
     with tab2:
         gallery = requests.get(GALLERY_URL).json()
         kat = st.selectbox("Pilih Kategori:", list(gallery.keys()))
         col1, col2 = st.columns(2)
-        if col1.button("Muat Gambar 1"): image = Image.open(requests.get(gallery[kat][0], stream=True).raw)
-        if col2.button("Muat Gambar 2"): image = Image.open(requests.get(gallery[kat][1], stream=True).raw)
+        if col1.button("Muat Gambar 1"): st.session_state.img_to_analyze = Image.open(requests.get(gallery[kat][0], stream=True).raw)
+        if col2.button("Muat Gambar 2"): st.session_state.img_to_analyze = Image.open(requests.get(gallery[kat][1], stream=True).raw)
     
-    if image and st.button("Analisis 3 Model"):
-        st.image(image, width=300)
-        class_names = requests.get(LABELS_URL).json()
-        cols = st.columns(3)
-        for i, (key, path) in enumerate({k:v for k,v in model_dict.items() if k.startswith(selected_batch)}.items()):
-            with cols[i]:
-                model = load_model(path)
-                preds = model.predict(np.expand_dims(np.array(image.convert('RGB').resize((256, 256)))/255.0, axis=0))
-                st.write(f"Model {key.split('/')[1]}: **{class_names[np.argmax(preds)]}**")
-                val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
-                if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
-                    if 'history' not in st.session_state: st.session_state.history = []
-                    st.session_state.history.append({"Model": key, "Hasil": class_names[np.argmax(preds)], "Validasi": val})
+    if st.session_state.img_to_analyze:
+        st.image(st.session_state.img_to_analyze, caption="Gambar yang dianalisis", width=300)
+        
+        if st.button("Analisis 3 Model"):
+            class_names = requests.get(LABELS_URL).json()
+            cols = st.columns(3)
+            batch_models = {k:v for k,v in model_dict.items() if k.startswith(selected_batch)}
+            
+            for i, (key, path) in enumerate(batch_models.items()):
+                with cols[i]:
+                    model = load_model(path)
+                    img_proc = st.session_state.img_to_analyze.convert('RGB').resize((256, 256))
+                    img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
+                    pred = model.predict(img_array)
+                    label = class_names[np.argmax(pred)]
+                    
+                    st.write(f"Model: {key.split('/')[1]}")
+                    st.success(f"Hasil: **{label}**")
+                    
+                    val = st.radio(f"Validasi", ["Belum", "Benar", "Salah"], key=f"val_{key}")
+                    if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
+                        if 'history' not in st.session_state: st.session_state.history = []
+                        st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
+                        st.balloons()
 
-# --- ROUTING LAINNYA ---
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
 elif menu == "Informasi":
-    st.title("ℹ️ Informasi")
-    st.write("Aplikasi deteksi penyakit menggunakan model deep learning (CNN, MobileNetV2, InceptionV3).")
+    informasi.render()
 elif menu == "Histori":
-    if 'history' in st.session_state: st.table(pd.DataFrame(st.session_state.history))
+    st.title("🕒 Histori Validasi")
+    if 'history' in st.session_state and st.session_state.history:
+        df = pd.DataFrame(st.session_state.history)
+        st.table(df)
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Unduh CSV", csv, "histori.csv", "text/csv")
