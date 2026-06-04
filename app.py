@@ -5,14 +5,15 @@ from PIL import Image
 import requests
 import pandas as pd
 import os
+import hasil_penelitian # Memanggil file modular
 
 # --- KONFIGURASI ---
 st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout="wide")
-
 REPO_OWNER = "blasterdark300"
 REPO_NAME = "leaf-disease-comparison-model"
 MODELS_BASE_PATH = "output/models" 
 LABELS_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/output/labels/labels.json"
+GALLERY_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/data_galeri.json"
 
 # --- FUNGSI ---
 @st.cache_data
@@ -48,7 +49,6 @@ menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Inform
 # --- HALAMAN DETEKSI ---
 if menu == "Deteksi Penyakit":
     st.title("🌿 Comparative Leaf Disease Analyzer")
-    
     model_dict = get_model_list()
     available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
     selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
@@ -59,45 +59,31 @@ if menu == "Deteksi Penyakit":
         camera_file = st.camera_input("Ambil foto")
         if camera_file: image = Image.open(camera_file)
     with tab2:
-        uploaded = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
-        if uploaded: image = Image.open(uploaded)
+        gallery = requests.get(GALLERY_URL).json()
+        kat = st.selectbox("Pilih Kategori:", list(gallery.keys()))
+        col1, col2 = st.columns(2)
+        if col1.button("Muat Gambar 1"): image = Image.open(requests.get(gallery[kat][0], stream=True).raw)
+        if col2.button("Muat Gambar 2"): image = Image.open(requests.get(gallery[kat][1], stream=True).raw)
     
     if image and st.button("Analisis 3 Model"):
-        st.image(image, caption="Gambar yang dianalisis", width=300)
+        st.image(image, width=300)
         class_names = requests.get(LABELS_URL).json()
         cols = st.columns(3)
-        batch_models = {k: v for k, v in model_dict.items() if k.startswith(selected_batch)}
-        
-        if 'history' not in st.session_state: st.session_state.history = []
-        for i, (key, path) in enumerate(batch_models.items()):
+        for i, (key, path) in enumerate({k:v for k,v in model_dict.items() if k.startswith(selected_batch)}.items()):
             with cols[i]:
-                st.subheader(f"Model: {key.split('/')[1]}")
                 model = load_model(path)
-                img_proc = image.convert('RGB').resize((256, 256))
-                img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
-                preds = model.predict(img_array)
-                label = class_names[np.argmax(preds)]
-                st.write(f"Hasil: **{label}**")
+                preds = model.predict(np.expand_dims(np.array(image.convert('RGB').resize((256, 256)))/255.0, axis=0))
+                st.write(f"Model {key.split('/')[1]}: **{class_names[np.argmax(preds)]}**")
                 val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
                 if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
-                    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-                    st.success("Tersimpan!")
+                    if 'history' not in st.session_state: st.session_state.history = []
+                    st.session_state.history.append({"Model": key, "Hasil": class_names[np.argmax(preds)], "Validasi": val})
 
-# --- HALAMAN LAINNYA ---
+# --- ROUTING LAINNYA ---
 elif menu == "Hasil Penelitian":
-    st.title("📊 Hasil Perbandingan Model")
-    st.markdown("| Model | Akurasi | Efisiensi |\n| :--- | :--- | :--- |\n| Custom CNN | 92% | Sedang |")
-
+    hasil_penelitian.render()
 elif menu == "Informasi":
     st.title("ℹ️ Informasi")
-    st.write("Aplikasi ini mendeteksi penyakit daun menggunakan deep learning.")
-
+    st.write("Aplikasi deteksi penyakit menggunakan model deep learning (CNN, MobileNetV2, InceptionV3).")
 elif menu == "Histori":
-    st.title("🕒 Histori Validasi")
-    if 'history' in st.session_state and st.session_state.history:
-        df = pd.DataFrame(st.session_state.history)
-        st.table(df)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Unduh CSV", csv, "hasil_validasi.csv", "text/csv")
-    else:
-        st.write("Belum ada data validasi.")
+    if 'history' in st.session_state: st.table(pd.DataFrame(st.session_state.history))
