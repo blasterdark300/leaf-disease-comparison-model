@@ -51,6 +51,11 @@ def load_image_from_url(url):
         st.error("Gagal memuat gambar dari URL tersebut.")
         return None
 
+def simpan_hasil(key, label, val):
+    if 'history' not in st.session_state: st.session_state.history = []
+    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
+    st.success(f"Data {key.split('/')[1]} tersimpan!")
+
 # --- SIDEBAR ---
 menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
 
@@ -71,7 +76,7 @@ if menu == "Deteksi Penyakit":
         uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
         if uploaded_file: image = Image.open(uploaded_file)
     with tab3:
-        url_input = st.text_input("Masukkan link URL gambar (.jpg/.png):")
+        url_input = st.text_input("Masukkan link URL gambar:")
         if url_input: image = load_image_from_url(url_input)
     
     if image:
@@ -94,10 +99,12 @@ if menu == "Deteksi Penyakit":
                     st.success(f"Hasil: **{label}**")
                     
                     val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
-                    if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
-                        if 'history' not in st.session_state: st.session_state.history = []
-                        st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-                        st.balloons()
+                    
+                    # Menggunakan callback agar data tersimpan saat tombol ditekan
+                    st.button(f"Simpan {key.split('/')[1]}", 
+                              key=f"btn_{key}", 
+                              on_click=simpan_hasil, 
+                              args=(key, label, val))
 
 # --- ROUTING LAINNYA ---
 elif menu == "Hasil Penelitian":
