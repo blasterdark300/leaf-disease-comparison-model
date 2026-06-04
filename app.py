@@ -128,7 +128,8 @@ if menu == "Deteksi Penyakit":
                             st.write(f"Model: {key.split('/')[1]}")
                             st.success(f"Hasil: **{label}**")
                             
-                            val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
+                            # Opsi Benar/Salah (Tanpa 'Belum')
+                            val = st.radio(f"Validasi {key}", ["Benar", "Salah"], key=f"radio_{key}")
                             st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}", on_click=simpan_hasil, args=(key, label, val))
 
 elif menu == "Hasil Penelitian":
