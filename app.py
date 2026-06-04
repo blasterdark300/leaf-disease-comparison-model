@@ -11,28 +11,44 @@ st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout=
 
 REPO_OWNER = "blasterdark300"
 REPO_NAME = "leaf-disease-comparison-model"
-MODELS_PATH = "output/models"
+# Path dasar di GitHub
+MODELS_BASE_PATH = "output/models" 
 LABELS_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/output/labels/labels.json"
 
 # --- FUNGSI ---
 @st.cache_data
 def get_model_list():
-    api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{MODELS_PATH}"
+    """Mengambil daftar model dari folder 8, 16, 32 di GitHub"""
+    api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{MODELS_BASE_PATH}"
     response = requests.get(api_url)
+    model_options = {}
+    
     if response.status_code == 200:
-        files = response.json()
-        return [f['name'] for f in files if f['name'].endswith(('.h5', '.keras'))]
-    return []
+        # Mengambil daftar folder (8, 16, 32)
+        folders = [f['name'] for f in response.json() if f['type'] == 'dir']
+        for folder in folders:
+            files_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{MODELS_BASE_PATH}/{folder}"
+            files_resp = requests.get(files_url)
+            if files_resp.status_code == 200:
+                for f in files_resp.json():
+                    if f['name'].endswith('.h5'):
+                        # Key untuk tampilan, Value untuk path download
+                        key = f"{folder}/{f['name']}"
+                        model_options[key] = f"{MODELS_BASE_PATH}/{key}"
+    return model_options
 
 @st.cache_resource
-def load_model(filename):
-    url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/raw/main/{MODELS_PATH}/{filename}"
-    local_path = filename
-    if not os.path.exists(local_path):
+def load_model(path_in_repo):
+    """Mendownload dan memuat model dari GitHub"""
+    url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/raw/main/{path_in_repo}"
+    # Ubah slash menjadi underscore untuk nama file lokal agar aman
+    local_filename = path_in_repo.replace("/", "_") 
+    
+    if not os.path.exists(local_filename):
         response = requests.get(url)
-        with open(local_path, "wb") as f:
+        with open(local_filename, "wb") as f:
             f.write(response.content)
-    return tf.keras.models.load_model(local_path, compile=False)
+    return tf.keras.models.load_model(local_filename, compile=False)
 
 # --- NAVIGASI SIDEBAR ---
 menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
@@ -40,12 +56,18 @@ menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Inform
 # --- HALAMAN DETEKSI ---
 if menu == "Deteksi Penyakit":
     st.title("🌿 Leaf Disease Analyzer")
-    model_files = get_model_list()
-    if not model_files: st.error("Model tidak ditemukan."); st.stop()
+    model_dict = get_model_list()
+    if not model_dict: 
+        st.error("Model tidak ditemukan. Pastikan folder dan file sudah di-push ke GitHub."); st.stop()
     
-    selected_model = st.selectbox("Pilih Model:", model_files)
-    model = load_model(selected_model)
-    class_names = requests.get(LABELS_URL).json()
+    selected_key = st.selectbox("Pilih Model (Batch Size/Nama):", list(model_dict.keys()))
+    model = load_model(model_dict[selected_key])
+    
+    # Load Labels
+    try:
+        class_names = requests.get(LABELS_URL).json()
+    except:
+        st.error("Gagal memuat labels.json"); st.stop()
 
     tab1, tab2 = st.tabs(["📸 Kamera", "📂 Galeri"])
     image = None
@@ -57,18 +79,19 @@ if menu == "Deteksi Penyakit":
         if uploaded: image = Image.open(uploaded)
 
     if image:
-        st.image(image, caption="Gambar yang dianalisis")
+        st.image(image, caption="Gambar yang dianalisis", use_container_width=True)
         if st.button("Analisis"):
-            img = image.convert('RGB').resize((256, 256))
-            img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
-            preds = model.predict(img_array)
-            label = class_names[np.argmax(preds)]
-            st.success(f"Hasil Prediksi: **{label}**")
-            
-            if 'history' not in st.session_state: st.session_state.history = []
-            st.session_state.history.append({"Model": selected_model, "Hasil": label})
+            with st.spinner("Sedang memproses..."):
+                img = image.convert('RGB').resize((256, 256))
+                img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
+                preds = model.predict(img_array)
+                label = class_names[np.argmax(preds)]
+                st.success(f"Hasil Prediksi: **{label}**")
+                
+                if 'history' not in st.session_state: st.session_state.history = []
+                st.session_state.history.append({"Model": selected_key, "Hasil": label})
 
-# --- HALAMAN HASIL PENELITIAN ---
+# --- HALAMAN LAINNYA ---
 elif menu == "Hasil Penelitian":
     st.title("📊 Hasil Perbandingan Model")
     st.markdown("""
@@ -79,12 +102,10 @@ elif menu == "Hasil Penelitian":
     | InceptionV3 | 98% | Rendah |
     """)
 
-# --- HALAMAN INFORMASI ---
 elif menu == "Informasi":
     st.title("ℹ️ Informasi")
-    st.write("Aplikasi ini menggunakan deep learning untuk deteksi penyakit daun.")
+    st.write("Aplikasi ini menggunakan deep learning untuk deteksi penyakit daun berdasarkan konfigurasi batch size yang berbeda.")
 
-# --- HALAMAN HISTORI ---
 elif menu == "Histori":
     st.title("🕒 Histori Prediksi")
     if 'history' in st.session_state and st.session_state.history:
