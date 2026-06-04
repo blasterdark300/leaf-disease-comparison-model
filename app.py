@@ -60,7 +60,7 @@ def load_image_from_url(url):
 # Callback untuk menyimpan dengan Toast
 def simpan_data_callback(key, label, val):
     st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-    st.toast(f"Data {key.split('/')[1]} tersimpan ke histori!", icon="✅")
+    st.toast(f"Data {key.split('/')[1]} tersimpan!", icon="✅")
 
 # --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
@@ -114,8 +114,8 @@ if menu == "Deteksi Penyakit":
             if not selected_models:
                 st.warning("Pilih minimal satu model!")
             else:
-                # Notifikasi status progres
-                with st.status("Sedang memproses model...", expanded=True) as status:
+                # Menggunakan Spinner untuk kompatibilitas versi
+                with st.spinner("Sedang memproses model..."):
                     class_names = requests.get(LABELS_URL).json()
                     cols = st.columns(len(selected_models))
                     
@@ -133,8 +133,6 @@ if menu == "Deteksi Penyakit":
                             with st.form(key=f"form_{key}"):
                                 val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True)
                                 st.form_submit_button("Simpan Hasil", on_click=simpan_data_callback, args=(key, label, val))
-                    
-                    status.update(label="Analisis Selesai!", state="complete", expanded=False)
 
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
