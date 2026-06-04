@@ -10,6 +10,13 @@ import informasi
 
 # --- KONFIGURASI ---
 st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout="wide")
+
+def safe_rerun():
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
+
 REPO_OWNER = "blasterdark300"
 REPO_NAME = "leaf-disease-comparison-model"
 MODELS_BASE_PATH = "output/models" 
@@ -48,15 +55,15 @@ def load_image_from_url(url):
         response = requests.get(url, stream=True)
         return Image.open(response.raw)
     except:
-        st.error("Gagal memuat gambar dari URL.")
+        st.error("Gagal memuat gambar.")
         return None
 
 def simpan_hasil(key, label, val):
     if 'history' not in st.session_state: st.session_state.history = []
     st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-    st.success(f"Data {key.split('/')[1]} tersimpan!")
+    st.success(f"✅ Tersimpan!")
 
-# --- INISIALISASI STATE ---
+# --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
 
 # --- SIDEBAR ---
@@ -66,7 +73,12 @@ menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Inform
 if menu == "Deteksi Penyakit":
     st.title("🌿 Comparative Leaf Disease Analyzer")
     model_dict = get_model_list()
-    selected_batch = st.selectbox("Pilih Batch Size:", sorted(list(set([k.split('/')[0] for k in model_dict.keys()]))))
+    available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
+    selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
+    
+    # Filter dan Pilih Model
+    batch_models = {k: v for k, v in model_dict.items() if k.startswith(selected_batch)}
+    selected_models = st.multiselect("Pilih Model untuk dianalisis:", list(batch_models.keys()))
     
     tab1, tab2, tab3 = st.tabs(["📸 Kamera", "📂 Upload File", "🔗 Link URL"])
     
@@ -75,42 +87,45 @@ if menu == "Deteksi Penyakit":
             camera_file = st.camera_input("Ambil foto")
             if camera_file: 
                 st.session_state.img_data = Image.open(camera_file)
-                st.rerun()
+                safe_rerun()
         else:
             if st.button("📸 Ambil Foto Baru"):
                 st.session_state.img_data = None
-                st.rerun()
+                safe_rerun()
     with tab2:
         uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
-        if uploaded_file: st.session_state.img_data = Image.open(uploaded_file)
+        if uploaded_file: 
+            st.session_state.img_data = Image.open(uploaded_file)
+            safe_rerun()
     with tab3:
         url_input = st.text_input("Masukkan link URL gambar:")
-        if url_input: st.session_state.img_data = load_image_from_url(url_input)
+        if url_input: 
+            st.session_state.img_data = load_image_from_url(url_input)
+            safe_rerun()
     
     if st.session_state.img_data:
         st.image(st.session_state.img_data, caption="Gambar yang dianalisis", width=300)
         
-        if st.button("Analisis 3 Model"):
-            class_names = requests.get(LABELS_URL).json()
-            cols = st.columns(3)
-            batch_models = {k: v for k, v in model_dict.items() if k.startswith(selected_batch)}
-            
-            for i, (key, path) in enumerate(batch_models.items()):
-                with cols[i]:
-                    model = load_model(path)
-                    img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
-                    img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
-                    preds = model.predict(img_array)
-                    label = class_names[np.argmax(preds)]
-                    
-                    st.write(f"Model: {key.split('/')[1]}")
-                    st.success(f"Hasil: **{label}**")
-                    
-                    val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
-                    st.button(f"Simpan {key.split('/')[1]}", 
-                              key=f"btn_{key}", 
-                              on_click=simpan_hasil, 
-                              args=(key, label, val))
+        if st.button("Analisis Model Terpilih"):
+            if not selected_models:
+                st.warning("Pilih minimal satu model!")
+            else:
+                class_names = requests.get(LABELS_URL).json()
+                cols = st.columns(len(selected_models))
+                
+                for i, key in enumerate(selected_models):
+                    with cols[i]:
+                        model = load_model(batch_models[key])
+                        img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
+                        img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
+                        preds = model.predict(img_array)
+                        label = class_names[np.argmax(preds)]
+                        
+                        st.write(f"Model: {key.split('/')[1]}")
+                        st.success(f"Hasil: **{label}**")
+                        
+                        val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
+                        st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}", on_click=simpan_hasil, args=(key, label, val))
 
 # --- ROUTING LAINNYA ---
 elif menu == "Hasil Penelitian":
