@@ -48,13 +48,16 @@ def load_image_from_url(url):
         response = requests.get(url, stream=True)
         return Image.open(response.raw)
     except:
-        st.error("Gagal memuat gambar dari URL tersebut.")
+        st.error("Gagal memuat gambar dari URL.")
         return None
 
 def simpan_hasil(key, label, val):
     if 'history' not in st.session_state: st.session_state.history = []
     st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
     st.success(f"Data {key.split('/')[1]} tersimpan!")
+
+# --- INISIALISASI STATE ---
+if 'img_data' not in st.session_state: st.session_state.img_data = None
 
 # --- SIDEBAR ---
 menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
@@ -63,24 +66,29 @@ menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Inform
 if menu == "Deteksi Penyakit":
     st.title("🌿 Comparative Leaf Disease Analyzer")
     model_dict = get_model_list()
-    available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
-    selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
+    selected_batch = st.selectbox("Pilih Batch Size:", sorted(list(set([k.split('/')[0] for k in model_dict.keys()]))))
     
     tab1, tab2, tab3 = st.tabs(["📸 Kamera", "📂 Upload File", "🔗 Link URL"])
-    image = None
     
     with tab1:
-        camera_file = st.camera_input("Ambil foto")
-        if camera_file: image = Image.open(camera_file)
+        if st.session_state.img_data is None:
+            camera_file = st.camera_input("Ambil foto")
+            if camera_file: 
+                st.session_state.img_data = Image.open(camera_file)
+                st.rerun()
+        else:
+            if st.button("📸 Ambil Foto Baru"):
+                st.session_state.img_data = None
+                st.rerun()
     with tab2:
         uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
-        if uploaded_file: image = Image.open(uploaded_file)
+        if uploaded_file: st.session_state.img_data = Image.open(uploaded_file)
     with tab3:
         url_input = st.text_input("Masukkan link URL gambar:")
-        if url_input: image = load_image_from_url(url_input)
+        if url_input: st.session_state.img_data = load_image_from_url(url_input)
     
-    if image:
-        st.image(image, caption="Gambar yang dianalisis", width=300)
+    if st.session_state.img_data:
+        st.image(st.session_state.img_data, caption="Gambar yang dianalisis", width=300)
         
         if st.button("Analisis 3 Model"):
             class_names = requests.get(LABELS_URL).json()
@@ -90,7 +98,7 @@ if menu == "Deteksi Penyakit":
             for i, (key, path) in enumerate(batch_models.items()):
                 with cols[i]:
                     model = load_model(path)
-                    img_proc = image.convert('RGB').resize((256, 256))
+                    img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
                     img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
                     preds = model.predict(img_array)
                     label = class_names[np.argmax(preds)]
@@ -99,8 +107,6 @@ if menu == "Deteksi Penyakit":
                     st.success(f"Hasil: **{label}**")
                     
                     val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
-                    
-                    # Menggunakan callback agar data tersimpan saat tombol ditekan
                     st.button(f"Simpan {key.split('/')[1]}", 
                               key=f"btn_{key}", 
                               on_click=simpan_hasil, 
