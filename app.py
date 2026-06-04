@@ -10,6 +10,14 @@ import informasi
 
 # --- KONFIGURASI ---
 st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout="wide")
+
+# Fungsi untuk mengatasi perbedaan versi Streamlit
+def safe_rerun():
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
+
 REPO_OWNER = "blasterdark300"
 REPO_NAME = "leaf-disease-comparison-model"
 MODELS_BASE_PATH = "output/models" 
@@ -76,21 +84,21 @@ if menu == "Deteksi Penyakit":
             camera_file = st.camera_input("Ambil foto")
             if camera_file: 
                 st.session_state.img_data = Image.open(camera_file)
-                st.rerun()
+                safe_rerun()
         else:
             if st.button("📸 Ambil Foto Baru"):
                 st.session_state.img_data = None
-                st.rerun()
+                safe_rerun()
     with tab2:
         uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
         if uploaded_file: 
             st.session_state.img_data = Image.open(uploaded_file)
-            st.rerun()
+            safe_rerun()
     with tab3:
         url_input = st.text_input("Masukkan link URL gambar:")
         if url_input: 
             st.session_state.img_data = load_image_from_url(url_input)
-            st.rerun()
+            safe_rerun()
     
     if st.session_state.img_data:
         st.image(st.session_state.img_data, caption="Gambar yang dianalisis", width=300)
@@ -111,7 +119,6 @@ if menu == "Deteksi Penyakit":
                     st.write(f"Model: {key.split('/')[1]}")
                     st.success(f"Hasil Prediksi: **{label}**")
                     
-                    # Validasi manual dari user
                     val = st.radio(f"Apakah prediksi ini benar?", ["Belum", "Benar", "Salah"], key=f"val_{key}")
                     
                     st.button(f"Simpan {key.split('/')[1]}", 
