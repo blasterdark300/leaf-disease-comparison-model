@@ -4,7 +4,7 @@ import pandas as pd
 def render():
     st.title("📊 Hasil Penelitian")
 
-    st.subheader("Tabel 4.1 Hasil Pelatihan Custom CNN")
+    st.subheader("Tabel Hasil Pelatihan Custom CNN")
     df_cnn = pd.DataFrame({
         "Batch Size": [8, 16, 32],
         "Epoch Berhenti": [47, 46, 44],
@@ -14,7 +14,7 @@ def render():
     })
     st.table(df_cnn)
 
-    st.subheader("Tabel 4.2 Hasil Pelatihan MobileNetV2")
+    st.subheader("Tabel Hasil Pelatihan MobileNetV2")
     df_mobilenet = pd.DataFrame({
         "Batch Size": [8, 16, 32],
         "Val. Accuracy": ["90,14%", "93,31%", "93,31%"],
@@ -23,7 +23,7 @@ def render():
     })
     st.table(df_mobilenet)
 
-    st.subheader("Tabel 4.3 Hasil Pelatihan InceptionV3")
+    st.subheader("Tabel Hasil Pelatihan InceptionV3")
     df_inception = pd.DataFrame({
         "Batch Size": [8, 16, 32],
         "Val. Accuracy": ["92,72%", "92,72%", "92,72%"],
@@ -32,7 +32,7 @@ def render():
     })
     st.table(df_inception)
 
-    st.subheader("Tabel 4.4 Rekap Perbandingan")
+    st.subheader("Tabel Rekap Perbandingan")
     df_rekap = pd.DataFrame({
         "Metrik": ["Val. Accuracy", "Val. Loss", "F1-Score (Macro)"],
         "Custom CNN (BS 32)": ["92,77%", 0.2577, 0.92],
