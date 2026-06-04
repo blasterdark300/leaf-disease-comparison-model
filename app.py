@@ -42,54 +42,56 @@ def load_model(path_in_repo):
             f.write(response.content)
     return tf.keras.models.load_model(local_filename, compile=False)
 
-# --- NAVIGASI ---
-menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Histori"])
+# --- SIDEBAR ---
+menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
 
 # --- HALAMAN DETEKSI ---
 if menu == "Deteksi Penyakit":
     st.title("🌿 Comparative Leaf Disease Analyzer")
     
-    # 1. Pilih Batch Size Terlebih Dahulu
     model_dict = get_model_list()
     available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
     selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
     
-    # 2. Input Gambar
-    image_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
+    tab1, tab2 = st.tabs(["📸 Kamera", "📂 Galeri"])
+    image = None
+    with tab1:
+        camera_file = st.camera_input("Ambil foto")
+        if camera_file: image = Image.open(camera_file)
+    with tab2:
+        uploaded = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
+        if uploaded: image = Image.open(uploaded)
     
-    if image_file and st.button("Analisis 3 Model"):
-        img = Image.open(image_file)
-        st.image(img, caption="Gambar yang dianalisis", width=300)
-        
+    if image and st.button("Analisis 3 Model"):
+        st.image(image, caption="Gambar yang dianalisis", width=300)
         class_names = requests.get(LABELS_URL).json()
         cols = st.columns(3)
-        
-        # Filter model berdasarkan batch
         batch_models = {k: v for k, v in model_dict.items() if k.startswith(selected_batch)}
         
         if 'history' not in st.session_state: st.session_state.history = []
-
         for i, (key, path) in enumerate(batch_models.items()):
             with cols[i]:
                 st.subheader(f"Model: {key.split('/')[1]}")
                 model = load_model(path)
-                
-                # Prediksi
-                img_proc = img.convert('RGB').resize((256, 256))
+                img_proc = image.convert('RGB').resize((256, 256))
                 img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
                 preds = model.predict(img_array)
                 label = class_names[np.argmax(preds)]
-                
-                st.write(f"Hasil Prediksi: **{label}**")
-                
-                # Validasi
+                st.write(f"Hasil: **{label}**")
                 val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
-                
-                if st.button(f"Simpan Hasil {key.split('/')[1]}", key=f"btn_{key}"):
+                if st.button(f"Simpan {key.split('/')[1]}", key=f"btn_{key}"):
                     st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-                    st.success(f"Hasil {key.split('/')[1]} tersimpan!")
+                    st.success("Tersimpan!")
 
-# --- HALAMAN HISTORI ---
+# --- HALAMAN LAINNYA ---
+elif menu == "Hasil Penelitian":
+    st.title("📊 Hasil Perbandingan Model")
+    st.markdown("| Model | Akurasi | Efisiensi |\n| :--- | :--- | :--- |\n| Custom CNN | 92% | Sedang |")
+
+elif menu == "Informasi":
+    st.title("ℹ️ Informasi")
+    st.write("Aplikasi ini mendeteksi penyakit daun menggunakan deep learning.")
+
 elif menu == "Histori":
     st.title("🕒 Histori Validasi")
     if 'history' in st.session_state and st.session_state.history:
