@@ -53,11 +53,17 @@ if menu == "Deteksi Penyakit":
     available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
     selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
     
-    # Input Gambar
-    image_file = st.file_uploader("Pilih gambar dari perangkat Anda", type=["jpg", "png", "jpeg"])
+    # Input Gambar (Kamera & Upload)
+    tab1, tab2 = st.tabs(["📸 Kamera", "📂 Upload File"])
+    image = None
+    with tab1:
+        camera_file = st.camera_input("Ambil foto daun")
+        if camera_file: image = Image.open(camera_file)
+    with tab2:
+        uploaded_file = st.file_uploader("Pilih gambar dari perangkat", type=["jpg", "png", "jpeg"])
+        if uploaded_file: image = Image.open(uploaded_file)
     
-    if image_file:
-        image = Image.open(image_file)
+    if image:
         st.image(image, caption="Gambar yang dianalisis", width=300)
         
         if st.button("Analisis 3 Model"):
