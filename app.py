@@ -57,10 +57,13 @@ def load_image_from_url(url):
     except:
         return None
 
-# Callback untuk menyimpan dengan Toast
+# Callback untuk menyimpan data secara stabil
 def simpan_data_callback(key, label, val):
-    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-    st.toast(f"Data {key.split('/')[1]} tersimpan!", icon="✅")
+    st.session_state.history.append({
+        "Model": key, 
+        "Hasil": label, 
+        "Validasi": val
+    })
 
 # --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
@@ -114,13 +117,12 @@ if menu == "Deteksi Penyakit":
             if not selected_models:
                 st.warning("Pilih minimal satu model!")
             else:
-                # Menggunakan Spinner untuk kompatibilitas versi
-                with st.spinner("Sedang memproses model..."):
-                    class_names = requests.get(LABELS_URL).json()
-                    cols = st.columns(len(selected_models))
-                    
-                    for i, key in enumerate(selected_models):
-                        with cols[i]:
+                class_names = requests.get(LABELS_URL).json()
+                cols = st.columns(len(selected_models))
+                
+                for i, key in enumerate(selected_models):
+                    with cols[i]:
+                        with st.spinner(f"Memproses..."):
                             model = load_model(batch_models[key])
                             img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
                             img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
@@ -130,9 +132,12 @@ if menu == "Deteksi Penyakit":
                             st.write(f"Model: {key.split('/')[1]}")
                             st.success(f"Hasil: **{label}**")
                             
+                            # Form dengan Callback
                             with st.form(key=f"form_{key}"):
-                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True)
-                                st.form_submit_button("Simpan Hasil", on_click=simpan_data_callback, args=(key, label, val))
+                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True, key=f"radio_{key}")
+                                submit = st.form_submit_button("Simpan Hasil", on_click=simpan_data_callback, args=(key, label, val))
+                                if submit:
+                                    st.success(f"✅ Tersimpan!")
 
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
@@ -146,4 +151,4 @@ elif menu == "Histori":
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Unduh CSV", csv, "histori_validasi.csv", "text/csv")
     else:
-        st.info("Belum ada data validasi.")
+        st.write("Belum ada data validasi.")
