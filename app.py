@@ -57,6 +57,14 @@ def load_image_from_url(url):
     except:
         return None
 
+# Callback untuk menyimpan data secara stabil
+def simpan_data_callback(key, label, val):
+    st.session_state.history.append({
+        "Model": key, 
+        "Hasil": label, 
+        "Validasi": val
+    })
+
 # --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
 if 'history' not in st.session_state: st.session_state.history = []
@@ -124,11 +132,11 @@ if menu == "Deteksi Penyakit":
                             st.write(f"Model: {key.split('/')[1]}")
                             st.success(f"Hasil: **{label}**")
                             
+                            # Form dengan Callback
                             with st.form(key=f"form_{key}"):
-                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True)
-                                submit = st.form_submit_button("Simpan Hasil")
+                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True, key=f"radio_{key}")
+                                submit = st.form_submit_button("Simpan Hasil", on_click=simpan_data_callback, args=(key, label, val))
                                 if submit:
-                                    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
                                     st.success(f"✅ Tersimpan!")
 
 elif menu == "Hasil Penelitian":
