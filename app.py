@@ -57,13 +57,9 @@ def load_image_from_url(url):
     except:
         return None
 
-def simpan_hasil(key, label, val):
-    if 'history' not in st.session_state: st.session_state.history = []
-    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-    st.success(f"✅ Data {key.split('/')[1]} tersimpan!")
-
 # --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
+if 'history' not in st.session_state: st.session_state.history = []
 
 # --- SIDEBAR ---
 menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
@@ -128,12 +124,12 @@ if menu == "Deteksi Penyakit":
                             st.write(f"Model: {key.split('/')[1]}")
                             st.success(f"Hasil: **{label}**")
                             
-                            # MENGGUNAKAN FORM AGAR PILIHAN TIDAK HILANG
                             with st.form(key=f"form_{key}"):
                                 val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True)
                                 submit = st.form_submit_button("Simpan Hasil")
                                 if submit:
-                                    simpan_hasil(key, label, val)
+                                    st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
+                                    st.success(f"✅ Tersimpan!")
 
 elif menu == "Hasil Penelitian":
     hasil_penelitian.render()
@@ -141,8 +137,10 @@ elif menu == "Informasi":
     informasi.render()
 elif menu == "Histori":
     st.title("🕒 Histori Validasi")
-    if 'history' in st.session_state and st.session_state.history:
+    if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
         st.table(df)
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Unduh CSV", csv, "histori_validasi.csv", "text/csv")
+    else:
+        st.write("Belum ada data validasi.")
