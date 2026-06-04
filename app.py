@@ -54,9 +54,9 @@ def load_image_from_url(url):
 def simpan_hasil(key, label, val):
     if 'history' not in st.session_state: st.session_state.history = []
     st.session_state.history.append({"Model": key, "Hasil": label, "Validasi": val})
-    st.success(f"Data {key.split('/')[1]} tersimpan!")
+    st.success(f"✅ Data {key.split('/')[1]} tersimpan!")
 
-# --- INISIALISASI STATE ---
+# --- INISIALISASI ---
 if 'img_data' not in st.session_state: st.session_state.img_data = None
 
 # --- SIDEBAR ---
@@ -66,7 +66,8 @@ menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Inform
 if menu == "Deteksi Penyakit":
     st.title("🌿 Comparative Leaf Disease Analyzer")
     model_dict = get_model_list()
-    selected_batch = st.selectbox("Pilih Batch Size:", sorted(list(set([k.split('/')[0] for k in model_dict.keys()]))))
+    available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
+    selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
     
     tab1, tab2, tab3 = st.tabs(["📸 Kamera", "📂 Upload File", "🔗 Link URL"])
     
@@ -82,10 +83,14 @@ if menu == "Deteksi Penyakit":
                 st.rerun()
     with tab2:
         uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
-        if uploaded_file: st.session_state.img_data = Image.open(uploaded_file)
+        if uploaded_file: 
+            st.session_state.img_data = Image.open(uploaded_file)
+            st.rerun()
     with tab3:
         url_input = st.text_input("Masukkan link URL gambar:")
-        if url_input: st.session_state.img_data = load_image_from_url(url_input)
+        if url_input: 
+            st.session_state.img_data = load_image_from_url(url_input)
+            st.rerun()
     
     if st.session_state.img_data:
         st.image(st.session_state.img_data, caption="Gambar yang dianalisis", width=300)
@@ -104,9 +109,11 @@ if menu == "Deteksi Penyakit":
                     label = class_names[np.argmax(preds)]
                     
                     st.write(f"Model: {key.split('/')[1]}")
-                    st.success(f"Hasil: **{label}**")
+                    st.success(f"Hasil Prediksi: **{label}**")
                     
-                    val = st.radio(f"Validasi {key}", ["Belum", "Benar", "Salah"], key=f"val_{key}")
+                    # Validasi manual dari user
+                    val = st.radio(f"Apakah prediksi ini benar?", ["Belum", "Benar", "Salah"], key=f"val_{key}")
+                    
                     st.button(f"Simpan {key.split('/')[1]}", 
                               key=f"btn_{key}", 
                               on_click=simpan_hasil, 
