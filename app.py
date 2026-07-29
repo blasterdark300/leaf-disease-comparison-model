@@ -1,3 +1,5 @@
+import os
+import tempfile
 import cv2
 from io import BytesIO
 import json
@@ -9,28 +11,28 @@ import streamlit as st
 import tensorflow as tf
 
 # =========================================================
-# KONFIGURASI MODEL
+# KONFIGURASI MODEL (REMOTE GITHUB RAW)
 # =========================================================
 MODELS_CONFIG = {
     "MobileNetV2": {
-        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) mobilenetv2 811\models\Leaf_Disease_MobileNetV2_FIXED_v3.keras",
-        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) mobilenetv2 811\labels\class_indices.json",
+        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20mobilenetv2%20811/models/Leaf_Disease_MobileNetV2_FIXED_v3.keras",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "📱",
         "accent": "#2D6A4F",
     },
     "InceptionV3": {
-        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) inceptionv3 811\models\Leaf_Disease_InceptionV3_FIXED_v3.h5",
-        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) inceptionv3 811\labels\class_indices.json",
+        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20inceptionv3%20811/models/Leaf_Disease_InceptionV3_FIXED_v3.h5",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "inception",
         "icon": "🔬",
         "accent": "#264653",
     },
     "Custom CNN (Scratch)": {
-        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\32\80 10 10\(32) Custom CNN  811\models\Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
-        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\32\80 10 10\(32) Custom CNN  811\labels\class_indices.json",
+        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/models/Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "🧠",
@@ -300,12 +302,13 @@ st.markdown(
 
 
 # =========================================================
-# LOAD LABEL & MODEL
+# LOAD LABEL & MODEL FROM REMOTE URL
 # =========================================================
 @st.cache_resource
-def load_class_names(labels_path: str):
-    with open(labels_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+def load_class_names(labels_url: str):
+    response = requests.get(labels_url, timeout=15)
+    response.raise_for_status()
+    data = response.json()
 
     sample_value = next(iter(data.values()))
     if isinstance(sample_value, int):
@@ -319,8 +322,24 @@ def load_class_names(labels_path: str):
 
 
 @st.cache_resource
-def load_model_cached(model_path: str):
-    model = tf.keras.models.load_model(model_path)
+def load_model_cached(model_url: str):
+    ext = ".keras" if model_url.endswith(".keras") else ".h5"
+    
+    response = requests.get(model_url, stream=True, timeout=60)
+    response.raise_for_status()
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                tmp_file.write(chunk)
+        tmp_path = tmp_file.name
+
+    try:
+        model = tf.keras.models.load_model(tmp_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            
     return model
 
 
@@ -438,16 +457,16 @@ st.markdown(
 )
 
 # =========================================================
-# LOAD MODEL & LABEL
+# LOAD MODEL & LABEL EXECUTION
 # =========================================================
 loaded_models = {}
 load_errors = {}
 
-with st.spinner("Memuat model AI..."):
+with st.spinner("Memuat model AI dari GitHub... (Mungkin butuh beberapa detik di awal)"):
     for model_name, config in MODELS_CONFIG.items():
         try:
-            model = load_model_cached(config["model_path"])
-            class_names = load_class_names(config["labels_path"])
+            model = load_model_cached(config["model_url"])
+            class_names = load_class_names(config["labels_url"])
             loaded_models[model_name] = {
                 "model": model,
                 "class_names": class_names,
@@ -462,7 +481,7 @@ if load_errors:
         st.error(f"**{model_name}**: {err}")
 
 if not loaded_models:
-    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa path lokasi model.")
+    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa tautan URL model.")
     st.stop()
 
 pills_html = "".join(
@@ -483,7 +502,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# URUTAN TAB: 1. Upload File / Galeri | 2. Kamera HP | 3. Link URL
 tab1, tab2, tab3 = st.tabs(
     ["📁 Upload File / Galeri", "📷 Kamera HP", "🔗 Link URL"]
 )
