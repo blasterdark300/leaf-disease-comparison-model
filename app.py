@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import requests
+import urllib.parse
 import streamlit as st
 import tensorflow as tf
 
@@ -42,16 +43,16 @@ MODELS_CONFIG = {
 # Base URL Raw Content
 RAW_IMG_BASE = "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/img/"
 
-# Daftar nama file yang ada di folder /img GitHub kamu
-# (Daftar manual ini menjamin gambar 100% selalu muncul tanpa terkena limit API GitHub)
-DEFAULT_SAMPLE_FILES = [
-    "Apple___Apple_scab.jpg",
-    "Apple___Black_rot.jpg",
-    "Corn_(maize)___Common_rust_.jpg",
-    "Grape___Black_rot.jpeg",
-    "Potato___Early_blight.JPG",
-    "Tomato___Bacterial_spot.webp",
-    "Tomato___Late_blight.png"
+# Daftar persis nama file yang ada di folder /img repository GitHub
+EXACT_SAMPLE_FILES = [
+    "20230712_123858_transparent.png",
+    "20230712_154725_transparent.png",
+    "4a5c555b-3f00-4553-b6a4-3be268969d7f___RS_LB 4323.JPG",
+    "4a7c680d-9c18-4065-a6e0-70cd2d0a3207___RS_Early.B 8107.JPG",
+    "HL_91.jpg",
+    "b4cd90ef-d3db-4680-9871-f7978b31d093___RS_L.Scorch 1052.JPG",
+    "e10f2f79-91b8-4210-95a3-f1fe50d109e2___PSU_CG 2295.JPG",
+    "f6bca207-2928-4753-b867-ec5f25361334___Mt.N.V_HL 9113.JPG",
 ]
 
 st.set_page_config(
@@ -268,33 +269,14 @@ st.markdown(
 # =========================================================
 @st.cache_data(ttl=3600)
 def fetch_sample_images():
-    """Mengambil daftar gambar contoh dengan fallback otomatis jika API GitHub Rate Limited."""
-    api_url = "https://api.github.com/repos/blasterdark300/leaf-disease-comparison-model/contents/img"
     image_list = []
-    
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(api_url, headers=headers, timeout=8)
-        if res.status_code == 200:
-            files = res.json()
-            valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
-            for file in files:
-                if file.get("type") == "file" and file.get("name", "").lower().endswith(valid_exts):
-                    image_list.append({
-                        "name": file["name"],
-                        "raw_url": file["download_url"]
-                    })
-    except Exception:
-        pass
-
-    # Jika API gagal / kena rate limit, gunakan daftar fallback manual
-    if not image_list:
-        for fname in DEFAULT_SAMPLE_FILES:
-            image_list.append({
-                "name": fname,
-                "raw_url": RAW_IMG_BASE + fname
-            })
-
+    for fname in EXACT_SAMPLE_FILES:
+        encoded_name = urllib.parse.quote(fname)
+        raw_url = RAW_IMG_BASE + encoded_name
+        image_list.append({
+            "name": fname,
+            "raw_url": raw_url
+        })
     return image_list
 
 
@@ -531,25 +513,25 @@ with tab3:
             st.error(f"Gagal memuat URL: {e}")
 
 with tab4:
-    st.caption("Klik salah satu gambar sampel di bawah untuk dianalisis:")
+    st.caption("Klik salah satu gambar contoh di bawah untuk dianalisis:")
     sample_images = fetch_sample_images()
     
-    # Tampilkan grid 3 kolom
-    cols = st.columns(3)
+    # Grid 4 Kolom
+    cols = st.columns(4)
     for idx, img_item in enumerate(sample_images):
-        col = cols[idx % 3]
+        col = cols[idx % 4]
         with col:
-            st.image(img_item["raw_url"], caption=img_item["name"], use_container_width=True)
-            if st.button("Pilih Gambar Ini", key=f"btn_sample_{idx}"):
+            st.image(img_item["raw_url"], caption=img_item["name"][:20] + "...", use_column_width=True)
+            if st.button("Gunakan", key=f"btn_sample_{idx}"):
                 st.session_state["selected_sample_url"] = img_item["raw_url"]
 
     if "selected_sample_url" in st.session_state:
         try:
             resp = requests.get(st.session_state["selected_sample_url"], timeout=10)
             image_to_predict = Image.open(BytesIO(resp.content))
-            st.success(f"Gambar terpilih dari `/img`!")
+            st.success("Gambar dari folder `/img` berhasil dipilih!")
         except Exception as ex:
-            st.error(f"Gagal memuat gambar terpilih: {ex}")
+            st.error(f"Gagal memuat gambar: {ex}")
 
 # =========================================================
 # EXECUTION & RESULTS
@@ -561,7 +543,7 @@ if image_to_predict is not None:
         st.image(
             image_to_predict,
             caption=f"Ukuran Terdeteksi: {image_to_predict.size[0]}x{image_to_predict.size[1]} px",
-            use_container_width=True,
+            use_column_width=True,
         )
 
     st.write("")
@@ -627,7 +609,7 @@ if image_to_predict is not None:
                     st.image(
                         res["gradcam"],
                         caption=f"Grad-CAM: {model_name}",
-                        use_container_width=True,
+                        use_column_width=True,
                     )
                 else:
                     st.warning(f"Grad-CAM tidak tersedia untuk {model_name}")
@@ -661,4 +643,4 @@ if image_to_predict is not None:
                         unsafe_allow_html=True,
                     )
 else:
-    st.info("💡 Silakan upload file, gunakan kamera, tempel URL, atau klik sampel gambar pada Tab 4.")
+    st.info("💡 Silakan upload file, gunakan kamera, tempel URL, atau pilih contoh gambar pada Tab 4.")
