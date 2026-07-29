@@ -11,30 +11,28 @@ import streamlit as st
 import tensorflow as tf
 
 # =========================================================
-# KONFIGURASI MODEL & LABELS (CORRECTED URLS)
+# KONFIGURASI MODEL (URL GITHUB WITH REDIRECT / RAW FIX)
 # =========================================================
-BASE_RAW_URL = "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main"
-
 MODELS_CONFIG = {
     "MobileNetV2": {
-        "model_url": f"{BASE_RAW_URL}/8/(8)%20mobilenetv2%20811/models/Leaf_Disease_MobileNetV2_FIXED_v3.keras",
-        "labels_url": f"{BASE_RAW_URL}/8/(8)%20mobilenetv2%20811/labels/class_indices.json",
+        "model_url": "https://github.com/blasterdark300/leaf-disease-comparison-model/raw/main/8/(8)%20mobilenetv2%20811/models/Leaf_Disease_MobileNetV2_FIXED_v3.keras",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20mobilenetv2%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "📱",
         "accent": "#2D6A4F",
     },
     "InceptionV3": {
-        "model_url": f"{BASE_RAW_URL}/8/(8)%20inceptionv3%20811/models/Leaf_Disease_InceptionV3_FIXED_v3.h5",
-        "labels_url": f"{BASE_RAW_URL}/8/(8)%20inceptionv3%20811/labels/class_indices.json",
+        "model_url": "https://github.com/blasterdark300/leaf-disease-comparison-model/raw/main/8/(8)%20inceptionv3%20811/models/Leaf_Disease_InceptionV3_FIXED_v3.h5",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20inceptionv3%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "inception",
         "icon": "🔬",
         "accent": "#264653",
     },
     "Custom CNN (Scratch)": {
-        "model_url": f"{BASE_RAW_URL}/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/models/Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
-        "labels_url": f"{BASE_RAW_URL}/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
+        "model_url": "https://github.com/blasterdark300/leaf-disease-comparison-model/raw/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/models/Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
+        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "🧠",
@@ -50,7 +48,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CUSTOM CSS — OPTIMALISASI MOBILE & DARK/LIGHT MODE
+# CUSTOM CSS — OPTIMALISASI MOBILE & TAMPILAN
 # =========================================================
 st.markdown(
     """
@@ -275,7 +273,8 @@ def load_class_names(labels_url: str):
 def load_model_cached(model_url: str):
     ext = ".keras" if model_url.endswith(".keras") else ".h5"
     
-    response = requests.get(model_url, stream=True, timeout=120)
+    # allow_redirects=True sangat krusial untuk mengikuti CDN Git LFS
+    response = requests.get(model_url, stream=True, allow_redirects=True, timeout=120)
     response.raise_for_status()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
@@ -283,6 +282,17 @@ def load_model_cached(model_url: str):
             if chunk:
                 tmp_file.write(chunk)
         tmp_path = tmp_file.name
+
+    # Validasi file size
+    file_size = os.path.getsize(tmp_path)
+    if file_size < 10 * 1024:  # Kurang dari 10KB dipastikan teks LFS Pointer / HTML 404
+        with open(tmp_path, "r", errors="ignore") as f:
+            content_preview = f.read(200)
+        os.remove(tmp_path)
+        raise ValueError(
+            f"File yang di-download bukan file model biner valid ({file_size} bytes). "
+            f"Gagal resolve Git LFS atau 404 Not Found. Preview isi: {content_preview}"
+        )
 
     try:
         model = tf.keras.models.load_model(tmp_path, compile=False)
@@ -356,7 +366,7 @@ def generate_gradcam(model, img_array, orig_img: Image.Image, pred_index=None, a
             heatmap, (orig_img_np.shape[1], orig_img_np.shape[0])
         )
 
-        # Matplotlib Colormap Fix (kompatibel dengan versi terbaru)
+        # Matplotlib Colormap Fix (kompatibel versi terbaru)
         jet = plt.colormaps["jet"]
         jet_colors = jet(np.arange(256))[:, :3]
         jet_heatmap = jet_colors[(heatmap_resized * 255).astype(np.uint8)]
@@ -408,7 +418,7 @@ st.markdown(
 loaded_models = {}
 load_errors = {}
 
-with st.spinner("Memuat model AI dari GitHub... (Mungkin butuh beberapa detik saat pertama kali dipanggil)"):
+with st.spinner("Memuat model AI dari repository... (Membutuhkan beberapa detik saat pertama kali dipanggil)"):
     for model_name, config in MODELS_CONFIG.items():
         try:
             model = load_model_cached(config["model_url"])
@@ -427,7 +437,7 @@ if load_errors:
         st.error(f"**{model_name}**: {err}")
 
 if not loaded_models:
-    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa koneksi atau struktur tautan URL.")
+    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa tautan URL model.")
     st.stop()
 
 pills_html = "".join(
