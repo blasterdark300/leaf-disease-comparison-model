@@ -11,7 +11,7 @@ import streamlit as st
 import tensorflow as tf
 
 # =========================================================
-# KONFIGURASI MODEL (URL GITHUB WITH REDIRECT / RAW FIX)
+# KONFIGURASI MODEL & SAMPLE IMAGES
 # =========================================================
 MODELS_CONFIG = {
     "MobileNetV2": {
@@ -39,6 +39,10 @@ MODELS_CONFIG = {
         "accent": "#BC6C25",
     },
 }
+
+# URL Folder Gambar Contoh
+SAMPLE_IMG_FOLDER_API = "https://api.github.com/repos/blasterdark300/leaf-disease-comparison-model/contents/img"
+SAMPLE_IMG_RAW_BASE = "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/img/"
 
 st.set_page_config(
     page_title="Klasifikasi Penyakit Daun",
@@ -250,8 +254,30 @@ st.markdown(
 )
 
 # =========================================================
-# HELPER LOADER MODEL & LABELS
+# HELPER LOADER MODEL, LABELS, & SAMPLE IMAGES
 # =========================================================
+@st.cache_data(ttl=3600)
+def fetch_sample_images():
+    """Mengambil daftar gambar contoh dari folder /img di repository GitHub."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(SAMPLE_IMG_FOLDER_API, headers=headers, timeout=10)
+        res.raise_for_status()
+        files = res.json()
+        
+        valid_extensions = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
+        image_list = []
+        for file in files:
+            if file.get("type") == "file" and file.get("name", "").lower().endswith(valid_extensions):
+                image_list.append({
+                    "name": file["name"],
+                    "raw_url": file["download_url"]
+                })
+        return image_list
+    except Exception:
+        # Fallback jika GitHub API rate-limited
+        return []
+
 @st.cache_resource
 def load_class_names(labels_url: str):
     response = requests.get(labels_url, timeout=15)
@@ -273,7 +299,6 @@ def load_class_names(labels_url: str):
 def load_model_cached(model_url: str):
     ext = ".keras" if model_url.endswith(".keras") else ".h5"
     
-    # allow_redirects=True sangat krusial untuk mengikuti CDN Git LFS
     response = requests.get(model_url, stream=True, allow_redirects=True, timeout=120)
     response.raise_for_status()
     
@@ -283,9 +308,8 @@ def load_model_cached(model_url: str):
                 tmp_file.write(chunk)
         tmp_path = tmp_file.name
 
-    # Validasi file size
     file_size = os.path.getsize(tmp_path)
-    if file_size < 10 * 1024:  # Kurang dari 10KB dipastikan teks LFS Pointer / HTML 404
+    if file_size < 10 * 1024:
         with open(tmp_path, "r", errors="ignore") as f:
             content_preview = f.read(200)
         os.remove(tmp_path)
@@ -366,7 +390,6 @@ def generate_gradcam(model, img_array, orig_img: Image.Image, pred_index=None, a
             heatmap, (orig_img_np.shape[1], orig_img_np.shape[0])
         )
 
-        # Matplotlib Colormap Fix (kompatibel versi terbaru)
         jet = plt.colormaps["jet"]
         jet_colors = jet(np.arange(256))[:, :3]
         jet_heatmap = jet_colors[(heatmap_resized * 255).astype(np.uint8)]
@@ -409,7 +432,7 @@ st.markdown(
     """
     <div class="hero-box">
         <h1>🌿 Klasifikasi Penyakit Daun</h1>
-        <p>Gunakan kamera HP, upload dari galeri iPhone/Android, atau tautan web untuk mendeteksi penyakit daun secara instant.</p>
+        <p>Gunakan kamera HP, upload dari galeri iPhone/Android, tautan web, atau pilih sampel gambar untuk mendeteksi penyakit daun.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -458,8 +481,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3 = st.tabs(
-    ["📁 Upload File / Galeri", "📷 Kamera HP", "🔗 Link URL"]
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["📁 Upload File / Galeri", "📷 Kamera HP", "🔗 Link URL", "🖼️ Gambar Contoh (/img)"]
 )
 
 image_to_predict = None
@@ -487,6 +510,38 @@ with tab3:
             image_to_predict = Image.open(BytesIO(response.content))
         except Exception as e:
             st.error(f"Gagal memuat URL: {e}")
+
+with tab4:
+    st.caption("Pilih salah satu gambar sampel langsung dari folder `/img` repository:")
+    sample_images = fetch_sample_images()
+    
+    if sample_images:
+        # Tampilkan gambar dalam bentuk Grid (3 kolom)
+        cols_per_row = 3
+        for i in range(0, len(sample_images), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for j, col in enumerate(cols):
+                if i + j < len(sample_images):
+                    img_item = sample_images[i + j]
+                    with col:
+                        st.image(img_item["raw_url"], use_column_width=True)
+                        if st.button(f"Gunakan {img_item['name']}", key=f"btn_sample_{i+j}"):
+                            try:
+                                resp = requests.get(img_item["raw_url"], timeout=10)
+                                image_to_predict = Image.open(BytesIO(resp.content))
+                                st.session_state["selected_sample_img"] = img_item["raw_url"]
+                            except Exception as ex:
+                                st.error(f"Gagal memuat gambar sampel: {ex}")
+        
+        # Jaga state jika gambar dari sampel sudah dipilih sebelumnya
+        if "selected_sample_img" in st.session_state and image_to_predict is None:
+            try:
+                resp = requests.get(st.session_state["selected_sample_img"], timeout=10)
+                image_to_predict = Image.open(BytesIO(resp.content))
+            except Exception:
+                pass
+    else:
+        st.info("ℹ️ Tidak dapat mengambil daftar gambar dari folder `/img` atau folder kosong.")
 
 # =========================================================
 # EXECUTION & RESULTS
@@ -598,4 +653,4 @@ if image_to_predict is not None:
                         unsafe_allow_html=True,
                     )
 else:
-    st.info("💡 Silakan upload file dari galeri, ambil foto dari kamera, atau masukkan link URL.")
+    st.info("💡 Silakan upload file dari galeri, ambil foto dari kamera, masukkan link URL, atau pilih contoh gambar dari tab 🖼️ Gambar Contoh.")
