@@ -8,7 +8,7 @@
 
 ### A Comparative Analysis of Custom CNN, MobileNetV2, and InceptionV3 for Multi-Plant Leaf Disease Identification
 
-> **🔗 Akses Aplikasi Web:** [Klik di sini untuk mencoba Deteksi Penyakit Daun secara Real-time](https://leaf-disease-comparison-model.streamlit.app/)
+> **🔗 Akses Aplikasi Web:** [Klik di sini untuk mencoba Deteksi Penyakit Daun secara Real-time](https://leaf-disease-comparison.streamlit.app/)
 
 ---
 
