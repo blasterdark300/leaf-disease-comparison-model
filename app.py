@@ -3,7 +3,7 @@ import tempfile
 import cv2
 from io import BytesIO
 import json
-import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import requests
@@ -11,28 +11,30 @@ import streamlit as st
 import tensorflow as tf
 
 # =========================================================
-# KONFIGURASI MODEL (REMOTE GITHUB RAW)
+# KONFIGURASI MODEL & LABELS (CORRECTED URLS)
 # =========================================================
+BASE_RAW_URL = "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main"
+
 MODELS_CONFIG = {
     "MobileNetV2": {
-        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20mobilenetv2%20811/models/Leaf_Disease_MobileNetV2_FIXED_v3.keras",
-        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
+        "model_url": f"{BASE_RAW_URL}/8/(8)%20mobilenetv2%20811/models/Leaf_Disease_MobileNetV2_FIXED_v3.keras",
+        "labels_url": f"{BASE_RAW_URL}/8/(8)%20mobilenetv2%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "📱",
         "accent": "#2D6A4F",
     },
     "InceptionV3": {
-        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/8/(8)%20inceptionv3%20811/models/Leaf_Disease_InceptionV3_FIXED_v3.h5",
-        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
+        "model_url": f"{BASE_RAW_URL}/8/(8)%20inceptionv3%20811/models/Leaf_Disease_InceptionV3_FIXED_v3.h5",
+        "labels_url": f"{BASE_RAW_URL}/8/(8)%20inceptionv3%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "inception",
         "icon": "🔬",
         "accent": "#264653",
     },
     "Custom CNN (Scratch)": {
-        "model_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/models/Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
-        "labels_url": "https://raw.githubusercontent.com/blasterdark300/leaf-disease-comparison-model/main/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
+        "model_url": f"{BASE_RAW_URL}/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/models/Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
+        "labels_url": f"{BASE_RAW_URL}/32/80%2010%2010/(32)%20Custom%20CNN%20%20811/labels/class_indices.json",
         "img_size": (256, 256),
         "preprocess": "rescale",
         "icon": "🧠",
@@ -48,7 +50,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CUSTOM CSS — OPTIMALISASI MOBILE, IPHONE, IPAD & ANDROID
+# CUSTOM CSS — OPTIMALISASI MOBILE & DARK/LIGHT MODE
 # =========================================================
 st.markdown(
     """
@@ -62,7 +64,6 @@ st.markdown(
 
         * { box-sizing: border-box; }
 
-        /* SAFETY NET: Memastikan teks tetap terlihat jelas di iOS / Android Dark Mode */
         .stApp, .stApp p, .stApp span, .stApp div, .stApp label, .stApp li,
         .streamlit-expanderHeader, .streamlit-expanderHeader *,
         .streamlit-expanderContent, .streamlit-expanderContent *,
@@ -99,7 +100,6 @@ st.markdown(
             display: block;
         }
 
-        /* Hero Header Optimasi Mobile */
         .hero-box {
             background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 45%, #52B788 100%);
             padding: 1.8rem 1.2rem;
@@ -126,7 +126,6 @@ st.markdown(
             color: #EAF6EE !important;
         }
 
-        /* Section Title */
         .section-title {
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
@@ -135,7 +134,6 @@ st.markdown(
             margin: 1.2rem 0 0.6rem 0;
         }
 
-        /* Status Pills */
         .model-pill {
             display: inline-block;
             background: #FFFFFF;
@@ -149,7 +147,6 @@ st.markdown(
             box-shadow: 0 2px 6px rgba(27, 67, 50, 0.05);
         }
 
-        /* Result Cards */
         .result-card {
             background: #FFFFFF;
             border-radius: 16px;
@@ -195,7 +192,6 @@ st.markdown(
             border-radius: 8px;
         }
 
-        /* Tombol Touch-Friendly untuk Layar Sentuh Mobile */
         div.stButton > button {
             background: linear-gradient(135deg, #1B4332, #40916C);
             color: white !important;
@@ -209,11 +205,7 @@ st.markdown(
             width: 100%;
             font-size: 0.98rem;
         }
-        div.stButton > button:active {
-            transform: scale(0.98);
-        }
 
-        /* Navigasi Tab Responsif */
         .stTabs [data-baseweb="tab-list"] {
             gap: 4px;
             flex-wrap: nowrap;
@@ -231,7 +223,6 @@ st.markdown(
             flex-shrink: 0;
         }
 
-        /* Expander Rincian */
         [data-testid="stExpander"] {
             background: white !important;
             border: 1px solid #C9DFC7;
@@ -243,38 +234,11 @@ st.markdown(
             padding: 0.8rem;
         }
 
-        /* CAMERA WIDGET OPTIMIZATION */
-        [data-testid="stCameraInput"] {
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto;
-        }
-
-        /* =========================================================
-           BREAKPOINTS MEDIA QUERIES (iPhone, iPad, Android)
-           ========================================================= */
-
-        /* Mobile Standard (iPhone, Android HP <= 640px) */
         @media (max-width: 640px) {
-            .block-container {
-                padding-left: 0.6rem;
-                padding-right: 0.6rem;
-                padding-top: 1rem;
-            }
-            .hero-box {
-                padding: 1.3rem 0.9rem;
-                border-radius: 16px;
-            }
-            .hero-box h1 {
-                font-size: 1.3rem;
-            }
-            .hero-box p {
-                font-size: 0.82rem;
-            }
-            .section-title {
-                font-size: 1rem;
-            }
-            /* Stack otomatis kolom menjadi vertikal pada HP */
+            .block-container { padding-left: 0.6rem; padding-right: 0.6rem; padding-top: 1rem; }
+            .hero-box { padding: 1.3rem 0.9rem; border-radius: 16px; }
+            .hero-box h1 { font-size: 1.3rem; }
+            .hero-box p { font-size: 0.82rem; }
             div[data-testid="column"] {
                 width: 100% !important;
                 flex: 1 1 100% !important;
@@ -282,27 +246,13 @@ st.markdown(
                 margin-bottom: 0.6rem;
             }
         }
-
-        /* Mobile Sangat Kecil / Layar Depan Galaxy Fold (<= 380px) */
-        @media (max-width: 380px) {
-            .hero-box h1 { font-size: 1.15rem; }
-            .hero-box p { font-size: 0.78rem; }
-            .stTabs [data-baseweb="tab"] { font-size: 0.78rem; padding: 6px 8px; }
-        }
-
-        /* Tablet (iPad Portrait & Android Tablet: 641px - 1024px) */
-        @media (min-width: 641px) and (max-width: 1024px) {
-            .block-container { padding: 1.5rem 1.2rem; }
-            .hero-box h1 { font-size: 1.7rem; }
-        }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-
 # =========================================================
-# LOAD LABEL & MODEL FROM REMOTE URL
+# HELPER LOADER MODEL & LABELS
 # =========================================================
 @st.cache_resource
 def load_class_names(labels_url: str):
@@ -325,17 +275,17 @@ def load_class_names(labels_url: str):
 def load_model_cached(model_url: str):
     ext = ".keras" if model_url.endswith(".keras") else ".h5"
     
-    response = requests.get(model_url, stream=True, timeout=60)
+    response = requests.get(model_url, stream=True, timeout=120)
     response.raise_for_status()
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
-        for chunk in response.iter_content(chunk_size=8192):
+        for chunk in response.iter_content(chunk_size=65536):
             if chunk:
                 tmp_file.write(chunk)
         tmp_path = tmp_file.name
 
     try:
-        model = tf.keras.models.load_model(tmp_path)
+        model = tf.keras.models.load_model(tmp_path, compile=False)
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -373,9 +323,7 @@ def find_last_conv_layer(model):
     raise ValueError("Tidak ditemukan layer Conv2D pada model untuk Grad-CAM.")
 
 
-def generate_gradcam(
-    model, img_array, orig_img: Image.Image, pred_index=None, alpha=0.4
-):
+def generate_gradcam(model, img_array, orig_img: Image.Image, pred_index=None, alpha=0.4):
     try:
         last_conv_layer_name = find_last_conv_layer(model)
 
@@ -400,7 +348,7 @@ def generate_gradcam(
         heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
         heatmap = tf.squeeze(heatmap)
 
-        heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+        heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-10)
         heatmap = heatmap.numpy()
 
         orig_img_np = np.array(orig_img.convert("RGB"))
@@ -408,7 +356,8 @@ def generate_gradcam(
             heatmap, (orig_img_np.shape[1], orig_img_np.shape[0])
         )
 
-        jet = cm.get_cmap("jet")
+        # Matplotlib Colormap Fix (kompatibel dengan versi terbaru)
+        jet = plt.colormaps["jet"]
         jet_colors = jet(np.arange(256))[:, :3]
         jet_heatmap = jet_colors[(heatmap_resized * 255).astype(np.uint8)]
         jet_heatmap = (jet_heatmap * 255).astype(np.uint8)
@@ -417,7 +366,7 @@ def generate_gradcam(
         superimposed_img = np.clip(superimposed_img, 0, 255).astype(np.uint8)
 
         return Image.fromarray(superimposed_img)
-    except Exception:
+    except Exception as e:
         return None
 
 
@@ -444,7 +393,7 @@ def confidence_color(conf: float) -> str:
 
 
 # =========================================================
-# UI — HERO HEADER
+# UI HEADER & PRELOAD
 # =========================================================
 st.markdown(
     """
@@ -456,13 +405,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# =========================================================
-# LOAD MODEL & LABEL EXECUTION
-# =========================================================
 loaded_models = {}
 load_errors = {}
 
-with st.spinner("Memuat model AI dari GitHub... (Mungkin butuh beberapa detik di awal)"):
+with st.spinner("Memuat model AI dari GitHub... (Mungkin butuh beberapa detik saat pertama kali dipanggil)"):
     for model_name, config in MODELS_CONFIG.items():
         try:
             model = load_model_cached(config["model_url"])
@@ -481,7 +427,7 @@ if load_errors:
         st.error(f"**{model_name}**: {err}")
 
 if not loaded_models:
-    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa tautan URL model.")
+    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa koneksi atau struktur tautan URL.")
     st.stop()
 
 pills_html = "".join(
@@ -495,7 +441,7 @@ st.markdown(
 )
 
 # =========================================================
-# UPLOAD & INPUT SECTION
+# INPUT GAMBAR
 # =========================================================
 st.markdown(
     '<div class="section-title">📤 Pilih Input Gambar</div>',
@@ -508,7 +454,6 @@ tab1, tab2, tab3 = st.tabs(
 
 image_to_predict = None
 
-# Tab 1: Upload File / Galeri
 with tab1:
     uploaded_file = st.file_uploader(
         "Pilih foto dari galeri HP atau dokumen",
@@ -518,14 +463,12 @@ with tab1:
     if uploaded_file is not None:
         image_to_predict = Image.open(uploaded_file)
 
-# Tab 2: Kamera HP
 with tab2:
     st.caption("💡 *Di iPhone/Android, pastikan memberikan izin akses kamera pada browser.*")
     camera_file = st.camera_input("Ambil foto daun", key="mobile_camera")
     if camera_file is not None:
         image_to_predict = Image.open(camera_file)
 
-# Tab 3: Link URL
 with tab3:
     url = st.text_input("Tempel link URL gambar")
     if url:
@@ -535,7 +478,9 @@ with tab3:
         except Exception as e:
             st.error(f"Gagal memuat URL: {e}")
 
-# Display & Tombol Eksekusi
+# =========================================================
+# EXECUTION & RESULTS
+# =========================================================
 if image_to_predict is not None:
     st.markdown("---")
     col_a, col_b, col_c = st.columns([1, 2, 1])
@@ -595,7 +540,6 @@ if image_to_predict is not None:
 
         st.divider()
 
-        # Grad-CAM Visualisasi
         st.markdown(
             '<div class="section-title">🔥 Area Fokus AI (Grad-CAM)</div>',
             unsafe_allow_html=True,
@@ -617,7 +561,6 @@ if image_to_predict is not None:
 
         st.divider()
 
-        # Detail Probabilitas
         st.markdown(
             '<div class="section-title">🔎 Rincian Probabilitas</div>',
             unsafe_allow_html=True,
