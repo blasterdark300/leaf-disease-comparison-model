@@ -1,0 +1,83 @@
+TEST SET - AFTER FINE TUNING
+============================================================
+
+Accuracy : 0.9737
+
+                               precision    recall  f1-score   support
+
+           Anggur Busuk Hitam     1.0000    0.9900    0.9950       100
+          Anggur Campak Hitam     0.9901    1.0000    0.9950       100
+            Anggur Hawar Daun     0.9900    0.9900    0.9900       100
+                 Anggur Sehat     1.0000    1.0000    1.0000       100
+       Apel Bercak Alternaria     0.9898    0.9700    0.9798       100
+          Apel Bercak Cokelat     1.0000    1.0000    1.0000       100
+             Apel Busuk Hitam     1.0000    1.0000    1.0000       100
+                   Apel Kudis     0.9900    0.9900    0.9900       100
+                   Apel Sehat     0.9709    1.0000    0.9852       100
+              Blueberry Sehat     0.9802    0.9900    0.9851       100
+            Ceri Embun Tepung     1.0000    1.0000    1.0000       100
+                   Ceri Sehat     1.0000    1.0000    1.0000       100
+            Jagung Bercak Abu     0.9320    0.9600    0.9458       100
+           Jagung Hawar Utara     0.9583    0.9200    0.9388       100
+            Jagung Karat Daun     1.0000    1.0000    1.0000       100
+                 Jagung Sehat     1.0000    1.0000    1.0000       100
+            Jambu Daun Kuning     1.0000    1.0000    1.0000       100
+        Jeruk Citrus Greening     1.0000    1.0000    1.0000       100
+             Jeruk Daun Rusak     1.0000    0.9800    0.9899       100
+           Jeruk Embun Tepung     0.9901    1.0000    0.9950       100
+                 Jeruk Kanker     1.0000    1.0000    1.0000       100
+     Jeruk Kutu Kebul Berduri     1.0000    1.0000    1.0000       100
+             Jeruk Kutu Putih     1.0000    1.0000    1.0000       100
+                  Jeruk Sehat     1.0000    1.0000    1.0000       100
+                Kedelai Sehat     0.9900    0.9900    0.9900       100
+                 Kentang Hama     0.9659    0.8500    0.9043       100
+           Kentang Hawar Dini     0.9802    0.9900    0.9851       100
+         Kentang Hawar Lambat     0.9406    0.9500    0.9453       100
+         Kentang Layu Bakteri     0.9216    0.9400    0.9307       100
+             Kentang Nematoda     1.0000    0.9700    0.9848       100
+                Kentang Sehat     0.9255    0.8700    0.8969       100
+Kentang Virus Daun Menggulung     0.9327    0.9700    0.9510       100
+         Kentang Virus Mosaik     1.0000    0.9800    0.9899       100
+            Kopi Bercak Phoma     1.0000    1.0000    1.0000       100
+            Labu Embun Tepung     1.0000    0.9900    0.9950       100
+             Mawar Karat Daun     0.9612    0.9900    0.9754       100
+          Padi Bercak Cokelat     0.9700    0.9700    0.9700       100
+                   Padi Sehat     0.9516    0.9833    0.9672        60
+                  Padi Tungro     0.9901    1.0000    0.9950       100
+       Paprika Bercak Bakteri     0.9706    0.9900    0.9802       100
+                Paprika Sehat     0.9802    0.9900    0.9851       100
+        Persik Bercak Bakteri     0.9899    0.9800    0.9849       100
+                 Persik Sehat     0.9615    1.0000    0.9804       100
+              Raspberry Sehat     0.9900    0.9900    0.9900       100
+       Stroberi Daun Terbakar     1.0000    1.0000    1.0000       100
+               Stroberi Sehat     1.0000    0.9900    0.9950       100
+             Tebu Busuk Merah     0.9320    0.9600    0.9458       100
+             Tebu Daun Kuning     0.9767    0.8400    0.9032       100
+              Tebu Karat Daun     0.9604    0.9700    0.9652       100
+                  Tebu Mosaik     0.9140    0.8500    0.8808       100
+                   Tebu Sehat     0.8190    0.9500    0.8796       100
+                 Terong Sehat     1.0000    1.0000    1.0000       100
+         Tomat Bercak Bakteri     0.9381    0.9100    0.9239       100
+        Tomat Bercak Septoria     0.9375    0.9000    0.9184       100
+          Tomat Bercak Target     0.8962    0.9500    0.9223       100
+          Tomat Daun Keriting     0.9703    0.9800    0.9751       100
+             Tomat Hawar Dini     0.8980    0.8800    0.8889       100
+           Tomat Hawar Lambat     0.8835    0.9100    0.8966       100
+             Tomat Jamur Daun     0.9608    0.9800    0.9703       100
+                  Tomat Sehat     0.9524    1.0000    0.9756       100
+       Tomat Tungau Laba-laba     0.9596    0.9500    0.9548       100
+           Tomat Virus Mosaik     1.0000    0.9800    0.9899       100
+             jambu antraknosa     1.0000    1.0000    1.0000       100
+       jambu gigitan serangga     1.0000    1.0000    1.0000       100
+                  jambu sehat     1.0000    1.0000    1.0000       100
+               jambu terbakar     1.0000    1.0000    1.0000       100
+              kopi karat daun     0.9703    0.9800    0.9751       100
+                   kopi sehat     0.9800    0.9800    0.9800       100
+            mangga antraknosa     1.0000    1.0000    1.0000       100
+          mangga embun tepung     0.9709    1.0000    0.9852       100
+          mangga jelaga hitam     1.0000    0.9700    0.9848       100
+                 mangga sehat     1.0000    1.0000    1.0000       100
+
+                     accuracy                         0.9737      7160
+                    macro avg     0.9741    0.9738    0.9736      7160
+                 weighted avg     0.9742    0.9737    0.9737      7160

@@ -1,154 +1,630 @@
-import streamlit as st
-import tensorflow as tf
+import cv2
+from io import BytesIO
+import json
+import matplotlib.cm as cm
 import numpy as np
 from PIL import Image
 import requests
-import pandas as pd
-import os
-import hasil_penelitian
-import informasi
+import streamlit as st
+import tensorflow as tf
 
-# --- KONFIGURASI ---
-st.set_page_config(page_title="Leaf Disease Analyzer", page_icon="🌿", layout="wide")
+# =========================================================
+# KONFIGURASI MODEL
+# =========================================================
+MODELS_CONFIG = {
+    "MobileNetV2": {
+        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) mobilenetv2 811\models\Leaf_Disease_MobileNetV2_FIXED_v3.keras",
+        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) mobilenetv2 811\labels\class_indices.json",
+        "img_size": (256, 256),
+        "preprocess": "rescale",
+        "icon": "📱",
+        "accent": "#2D6A4F",
+    },
+    "InceptionV3": {
+        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) inceptionv3 811\models\Leaf_Disease_InceptionV3_FIXED_v3.h5",
+        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\8\(8) inceptionv3 811\labels\class_indices.json",
+        "img_size": (256, 256),
+        "preprocess": "inception",
+        "icon": "🔬",
+        "accent": "#264653",
+    },
+    "Custom CNN (Scratch)": {
+        "model_path": r"C:\Users\crism\Music\New folder (5)\final_output\32\80 10 10\(32) Custom CNN  811\models\Leaf_Disease_CustomCNN_Scratch_1Fase.h5",
+        "labels_path": r"C:\Users\crism\Music\New folder (5)\final_output\32\80 10 10\(32) Custom CNN  811\labels\class_indices.json",
+        "img_size": (256, 256),
+        "preprocess": "rescale",
+        "icon": "🧠",
+        "accent": "#BC6C25",
+    },
+}
 
-def safe_rerun():
-    try:
-        st.rerun()
-    except AttributeError:
-        st.experimental_rerun()
+st.set_page_config(
+    page_title="Klasifikasi Penyakit Daun",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-REPO_OWNER = "blasterdark300"
-REPO_NAME = "leaf-disease-comparison-model"
-MODELS_BASE_PATH = "output/models" 
-LABELS_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/main/output/labels/labels.json"
+# =========================================================
+# CUSTOM CSS — OPTIMALISASI MOBILE, IPHONE, IPAD & ANDROID
+# =========================================================
+st.markdown(
+    """
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
-# --- FUNGSI ---
-@st.cache_data
-def get_model_list():
-    api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{MODELS_BASE_PATH}"
-    response = requests.get(api_url)
-    model_options = {}
-    if response.status_code == 200:
-        folders = [f['name'] for f in response.json() if f['type'] == 'dir']
-        for folder in folders:
-            files_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{MODELS_BASE_PATH}/{folder}"
-            files_resp = requests.get(files_url)
-            if files_resp.status_code == 200:
-                for f in files_resp.json():
-                    if f['name'].endswith('.h5'):
-                        key = f"{folder}/{f['name']}"
-                        model_options[key] = f"{MODELS_BASE_PATH}/{key}"
-    return model_options
+        html, body, [class*="css"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        * { box-sizing: border-box; }
+
+        /* SAFETY NET: Memastikan teks tetap terlihat jelas di iOS / Android Dark Mode */
+        .stApp, .stApp p, .stApp span, .stApp div, .stApp label, .stApp li,
+        .streamlit-expanderHeader, .streamlit-expanderHeader *,
+        .streamlit-expanderContent, .streamlit-expanderContent *,
+        [data-testid="stExpander"], [data-testid="stExpander"] *,
+        [data-testid="stExpanderDetails"], [data-testid="stExpanderDetails"] *,
+        [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
+        [data-testid="stText"], [data-testid="stCaptionContainer"] {
+            color: #1B2E22 !important;
+        }
+
+        .stApp {
+            background: linear-gradient(180deg, #FAF8F2 0%, #EEF3E9 55%, #E8F0E6 100%);
+        }
+
+        .block-container {
+            max-width: 1100px;
+            padding-top: 1.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-bottom: 3rem;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+
+        img { max-width: 100%; height: auto; }
+        [data-testid="stImage"] img {
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(27, 67, 50, 0.15);
+            margin: 0 auto;
+            display: block;
+        }
+
+        /* Hero Header Optimasi Mobile */
+        .hero-box {
+            background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 45%, #52B788 100%);
+            padding: 1.8rem 1.2rem;
+            border-radius: 20px;
+            color: #F4FAF6;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 10px 28px rgba(27, 67, 50, 0.22);
+            text-align: center;
+        }
+        .hero-box h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 1.8rem;
+            margin-bottom: 0.4rem;
+            line-height: 1.2;
+            color: #FFFFFF !important;
+        }
+        .hero-box p {
+            font-size: 0.92rem;
+            opacity: 0.95;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.45;
+            color: #EAF6EE !important;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1.15rem;
+            color: #1B4332;
+            margin: 1.2rem 0 0.6rem 0;
+        }
+
+        /* Status Pills */
+        .model-pill {
+            display: inline-block;
+            background: #FFFFFF;
+            border: 1px solid #C9DFC7;
+            color: #2D6A4F;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin: 2px 4px 4px 0;
+            box-shadow: 0 2px 6px rgba(27, 67, 50, 0.05);
+        }
+
+        /* Result Cards */
+        .result-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 1.1rem 0.9rem;
+            box-shadow: 0 6px 20px rgba(27, 67, 50, 0.08);
+            border-top: 5px solid var(--accent, #2D6A4F);
+            text-align: center;
+            height: 100%;
+            margin-bottom: 0.5rem;
+        }
+        .result-card .model-name {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #3A5A4A;
+            margin-bottom: 0.4rem;
+        }
+        .result-card .pred-label {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #143A2A;
+            background: linear-gradient(135deg, #EAF6EE 0%, #DEF0E3 100%);
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin-bottom: 0.5rem;
+            word-break: break-word;
+        }
+        .result-card .confidence-text {
+            font-size: 0.82rem;
+            color: #5B7A67;
+        }
+
+        .conf-bar-bg {
+            background: #E7EFEA;
+            border-radius: 8px;
+            height: 8px;
+            width: 100%;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .conf-bar-fill {
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        /* Tombol Touch-Friendly untuk Layar Sentuh Mobile */
+        div.stButton > button {
+            background: linear-gradient(135deg, #1B4332, #40916C);
+            color: white !important;
+            font-weight: 600;
+            border: none;
+            border-radius: 14px;
+            padding: 0.8rem 1.2rem;
+            min-height: 48px;
+            box-shadow: 0 6px 18px rgba(27, 67, 50, 0.25);
+            transition: all 0.2s ease;
+            width: 100%;
+            font-size: 0.98rem;
+        }
+        div.stButton > button:active {
+            transform: scale(0.98);
+        }
+
+        /* Navigasi Tab Responsif */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 4px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background: white;
+            border-radius: 10px 10px 0 0;
+            padding: 8px 12px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* Expander Rincian */
+        [data-testid="stExpander"] {
+            background: white !important;
+            border: 1px solid #C9DFC7;
+            border-radius: 14px;
+            margin-bottom: 10px;
+        }
+        [data-testid="stExpanderDetails"] {
+            background: white !important;
+            padding: 0.8rem;
+        }
+
+        /* CAMERA WIDGET OPTIMIZATION */
+        [data-testid="stCameraInput"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 auto;
+        }
+
+        /* =========================================================
+           BREAKPOINTS MEDIA QUERIES (iPhone, iPad, Android)
+           ========================================================= */
+
+        /* Mobile Standard (iPhone, Android HP <= 640px) */
+        @media (max-width: 640px) {
+            .block-container {
+                padding-left: 0.6rem;
+                padding-right: 0.6rem;
+                padding-top: 1rem;
+            }
+            .hero-box {
+                padding: 1.3rem 0.9rem;
+                border-radius: 16px;
+            }
+            .hero-box h1 {
+                font-size: 1.3rem;
+            }
+            .hero-box p {
+                font-size: 0.82rem;
+            }
+            .section-title {
+                font-size: 1rem;
+            }
+            /* Stack otomatis kolom menjadi vertikal pada HP */
+            div[data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+                min-width: 100% !important;
+                margin-bottom: 0.6rem;
+            }
+        }
+
+        /* Mobile Sangat Kecil / Layar Depan Galaxy Fold (<= 380px) */
+        @media (max-width: 380px) {
+            .hero-box h1 { font-size: 1.15rem; }
+            .hero-box p { font-size: 0.78rem; }
+            .stTabs [data-baseweb="tab"] { font-size: 0.78rem; padding: 6px 8px; }
+        }
+
+        /* Tablet (iPad Portrait & Android Tablet: 641px - 1024px) */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .block-container { padding: 1.5rem 1.2rem; }
+            .hero-box h1 { font-size: 1.7rem; }
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# =========================================================
+# LOAD LABEL & MODEL
+# =========================================================
+@st.cache_resource
+def load_class_names(labels_path: str):
+    with open(labels_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    sample_value = next(iter(data.values()))
+    if isinstance(sample_value, int):
+        sorted_items = sorted(data.items(), key=lambda x: x[1])
+        names = [name for name, idx in sorted_items]
+    else:
+        sorted_items = sorted(data.items(), key=lambda x: int(x[0]))
+        names = [name for idx, name in sorted_items]
+
+    return names
+
 
 @st.cache_resource
-def load_model(path_in_repo):
-    url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/raw/main/{path_in_repo}"
-    local_filename = path_in_repo.replace("/", "_")
-    if not os.path.exists(local_filename):
-        response = requests.get(url)
-        with open(local_filename, "wb") as f:
-            f.write(response.content)
-    return tf.keras.models.load_model(local_filename, compile=False)
+def load_model_cached(model_path: str):
+    model = tf.keras.models.load_model(model_path)
+    return model
 
-def load_image_from_url(url):
+
+def preprocess_image(img: Image.Image, img_size, method: str) -> np.ndarray:
+    img = img.convert("RGB")
+    img = img.resize(img_size)
+    arr = np.array(img).astype("float32")
+
+    if method == "inception":
+        arr = tf.keras.applications.inception_v3.preprocess_input(arr)
+    else:
+        arr = arr / 255.0
+
+    arr = np.expand_dims(arr, axis=0)
+    return arr
+
+
+def find_last_conv_layer(model):
+    for layer in reversed(model.layers):
+        if hasattr(layer, "layers"):
+            for sub_layer in reversed(layer.layers):
+                if isinstance(sub_layer, tf.keras.layers.Conv2D):
+                    return sub_layer.name
+        if isinstance(layer, tf.keras.layers.Conv2D):
+            return layer.name
+
+    for layer in reversed(model.layers):
+        if "conv" in layer.name.lower():
+            return layer.name
+
+    raise ValueError("Tidak ditemukan layer Conv2D pada model untuk Grad-CAM.")
+
+
+def generate_gradcam(
+    model, img_array, orig_img: Image.Image, pred_index=None, alpha=0.4
+):
     try:
-        response = requests.get(url, stream=True, timeout=10)
-        return Image.open(response.raw)
-    except:
+        last_conv_layer_name = find_last_conv_layer(model)
+
+        grad_model = tf.keras.models.Model(
+            inputs=[model.inputs],
+            outputs=[
+                model.get_layer(last_conv_layer_name).output,
+                model.output,
+            ],
+        )
+
+        with tf.GradientTape() as tape:
+            conv_outputs, predictions = grad_model(img_array)
+            if pred_index is None:
+                pred_index = tf.argmax(predictions[0])
+            class_channel = predictions[:, pred_index]
+
+        grads = tape.gradient(class_channel, conv_outputs)
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+        conv_outputs = conv_outputs[0]
+        heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+
+        heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+        heatmap = heatmap.numpy()
+
+        orig_img_np = np.array(orig_img.convert("RGB"))
+        heatmap_resized = cv2.resize(
+            heatmap, (orig_img_np.shape[1], orig_img_np.shape[0])
+        )
+
+        jet = cm.get_cmap("jet")
+        jet_colors = jet(np.arange(256))[:, :3]
+        jet_heatmap = jet_colors[(heatmap_resized * 255).astype(np.uint8)]
+        jet_heatmap = (jet_heatmap * 255).astype(np.uint8)
+
+        superimposed_img = jet_heatmap * alpha + orig_img_np
+        superimposed_img = np.clip(superimposed_img, 0, 255).astype(np.uint8)
+
+        return Image.fromarray(superimposed_img)
+    except Exception:
         return None
 
-# Callback untuk menyimpan data secara stabil
-def simpan_data_callback(key, label, val):
-    st.session_state.history.append({
-        "Model": key, 
-        "Hasil": label, 
-        "Validasi": val
-    })
 
-# --- INISIALISASI ---
-if 'img_data' not in st.session_state: st.session_state.img_data = None
-if 'history' not in st.session_state: st.session_state.history = []
+def predict(model, class_names, img: Image.Image, img_size, preprocess_method):
+    x = preprocess_image(img, img_size, preprocess_method)
+    preds = model.predict(x)
+    probs = preds[0]
+    idx = int(np.argmax(probs))
+    label = class_names[idx] if idx < len(class_names) else f"Class_{idx}"
+    confidence = float(probs[idx])
 
-# --- SIDEBAR ---
-menu = st.sidebar.radio("Menu", ["Deteksi Penyakit", "Hasil Penelitian", "Informasi", "Histori"])
+    gradcam_img = generate_gradcam(model, x, img, pred_index=idx)
 
-# --- HALAMAN DETEKSI ---
-if menu == "Deteksi Penyakit":
-    st.title("🌿 Comparative Leaf Disease Analyzer")
-    model_dict = get_model_list()
-    available_batches = sorted(list(set([k.split('/')[0] for k in model_dict.keys()])))
-    selected_batch = st.selectbox("Pilih Batch Size:", available_batches)
-    
-    batch_models = {k: v for k, v in model_dict.items() if k.startswith(selected_batch)}
-    selected_models = st.multiselect("Pilih Model untuk dianalisis:", list(batch_models.keys()))
-    
-    tab1, tab2, tab3 = st.tabs(["📸 Kamera", "📂 Upload File", "🔗 Link URL"])
-    
-    with tab1:
-        if st.session_state.img_data is None:
-            camera_file = st.camera_input("Ambil foto")
-            if camera_file: 
-                st.session_state.img_data = Image.open(camera_file)
-                safe_rerun()
-        else:
-            if st.button("📸 Ambil Foto Baru"):
-                st.session_state.img_data = None
-                safe_rerun()
-    with tab2:
-        uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "png", "jpeg"])
-        if uploaded_file: 
-            st.session_state.img_data = Image.open(uploaded_file)
-            safe_rerun()
-    with tab3:
-        url_input = st.text_input("Masukkan link URL gambar:")
-        if st.button("Muat Gambar dari URL"):
-            with st.spinner("Mengunduh..."):
-                img = load_image_from_url(url_input)
-                if img:
-                    st.session_state.img_data = img
-                    safe_rerun()
-                else:
-                    st.error("Gagal memuat URL!")
-    
-    if st.session_state.img_data:
-        st.image(st.session_state.img_data, caption="Gambar yang dianalisis", width=300)
-        
-        if st.button("Analisis Model Terpilih"):
-            if not selected_models:
-                st.warning("Pilih minimal satu model!")
-            else:
-                class_names = requests.get(LABELS_URL).json()
-                cols = st.columns(len(selected_models))
-                
-                for i, key in enumerate(selected_models):
-                    with cols[i]:
-                        with st.spinner(f"Memproses..."):
-                            model = load_model(batch_models[key])
-                            img_proc = st.session_state.img_data.convert('RGB').resize((256, 256))
-                            img_array = np.expand_dims(np.array(img_proc) / 255.0, axis=0)
-                            preds = model.predict(img_array)
-                            label = class_names[np.argmax(preds)]
-                            
-                            st.write(f"Model: {key.split('/')[1]}")
-                            st.success(f"Hasil: **{label}**")
-                            
-                            # Form dengan Callback
-                            with st.form(key=f"form_{key}"):
-                                val = st.radio("Validasi:", ["Benar", "Salah"], horizontal=True, key=f"radio_{key}")
-                                submit = st.form_submit_button("Simpan Hasil", on_click=simpan_data_callback, args=(key, label, val))
-                                if submit:
-                                    st.success(f"✅ Tersimpan!")
+    return label, confidence, probs, gradcam_img
 
-elif menu == "Hasil Penelitian":
-    hasil_penelitian.render()
-elif menu == "Informasi":
-    informasi.render()
-elif menu == "Histori":
-    st.title("🕒 Histori Validasi")
-    if st.session_state.history:
-        df = pd.DataFrame(st.session_state.history)
-        st.table(df)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Unduh CSV", csv, "histori_validasi.csv", "text/csv")
+
+def confidence_color(conf: float) -> str:
+    if conf >= 0.75:
+        return "#2D6A4F"
+    elif conf >= 0.4:
+        return "#BC6C25"
     else:
-        st.write("Belum ada data validasi.")
+        return "#9C3D1F"
+
+
+# =========================================================
+# UI — HERO HEADER
+# =========================================================
+st.markdown(
+    """
+    <div class="hero-box">
+        <h1>🌿 Klasifikasi Penyakit Daun</h1>
+        <p>Gunakan kamera HP, upload dari galeri iPhone/Android, atau tautan web untuk mendeteksi penyakit daun secara instant.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# LOAD MODEL & LABEL
+# =========================================================
+loaded_models = {}
+load_errors = {}
+
+with st.spinner("Memuat model AI..."):
+    for model_name, config in MODELS_CONFIG.items():
+        try:
+            model = load_model_cached(config["model_path"])
+            class_names = load_class_names(config["labels_path"])
+            loaded_models[model_name] = {
+                "model": model,
+                "class_names": class_names,
+                "config": config,
+            }
+        except Exception as e:
+            load_errors[model_name] = str(e)
+
+if load_errors:
+    st.warning("⚠️ Beberapa model gagal dimuat:")
+    for model_name, err in load_errors.items():
+        st.error(f"**{model_name}**: {err}")
+
+if not loaded_models:
+    st.error("❌ Tidak ada model yang berhasil dimuat. Periksa path lokasi model.")
+    st.stop()
+
+pills_html = "".join(
+    f'<span class="model-pill">{cfg["icon"]} {name}</span>'
+    for name, cfg in MODELS_CONFIG.items()
+    if name in loaded_models
+)
+st.markdown(
+    f'<div style="margin-bottom: 0.6rem; text-align: center;">{pills_html}</div>',
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# UPLOAD & INPUT SECTION
+# =========================================================
+st.markdown(
+    '<div class="section-title">📤 Pilih Input Gambar</div>',
+    unsafe_allow_html=True,
+)
+
+# URUTAN TAB: 1. Upload File / Galeri | 2. Kamera HP | 3. Link URL
+tab1, tab2, tab3 = st.tabs(
+    ["📁 Upload File / Galeri", "📷 Kamera HP", "🔗 Link URL"]
+)
+
+image_to_predict = None
+
+# Tab 1: Upload File / Galeri
+with tab1:
+    uploaded_file = st.file_uploader(
+        "Pilih foto dari galeri HP atau dokumen",
+        type=["jpg", "jpeg", "png", "webp", "bmp"],
+        key="uploader",
+    )
+    if uploaded_file is not None:
+        image_to_predict = Image.open(uploaded_file)
+
+# Tab 2: Kamera HP
+with tab2:
+    st.caption("💡 *Di iPhone/Android, pastikan memberikan izin akses kamera pada browser.*")
+    camera_file = st.camera_input("Ambil foto daun", key="mobile_camera")
+    if camera_file is not None:
+        image_to_predict = Image.open(camera_file)
+
+# Tab 3: Link URL
+with tab3:
+    url = st.text_input("Tempel link URL gambar")
+    if url:
+        try:
+            response = requests.get(url, timeout=10)
+            image_to_predict = Image.open(BytesIO(response.content))
+        except Exception as e:
+            st.error(f"Gagal memuat URL: {e}")
+
+# Display & Tombol Eksekusi
+if image_to_predict is not None:
+    st.markdown("---")
+    col_a, col_b, col_c = st.columns([1, 2, 1])
+    with col_b:
+        st.image(
+            image_to_predict,
+            caption=f"Ukuran: {image_to_predict.size[0]}x{image_to_predict.size[1]} px",
+            use_column_width=True,
+        )
+
+    st.write("")
+    run_prediction = st.button("🔍 Analisis Sekarang", type="primary")
+
+    if run_prediction:
+        results = {}
+        with st.spinner("Menganalisis gambar..."):
+            for model_name, item in loaded_models.items():
+                cfg = item["config"]
+                label, confidence, probs, gradcam_img = predict(
+                    item["model"],
+                    item["class_names"],
+                    image_to_predict,
+                    cfg["img_size"],
+                    cfg["preprocess"],
+                )
+                results[model_name] = {
+                    "label": label,
+                    "confidence": confidence,
+                    "probs": probs,
+                    "gradcam": gradcam_img,
+                    "class_names": item["class_names"],
+                }
+
+        st.markdown(
+            '<div class="section-title">📊 Hasil Diagnosa AI</div>',
+            unsafe_allow_html=True,
+        )
+
+        cols = st.columns(len(results))
+        for col, (model_name, res) in zip(cols, results.items()):
+            cfg = MODELS_CONFIG[model_name]
+            bar_color = confidence_color(res["confidence"])
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="result-card" style="--accent: {cfg['accent']};">
+                        <div class="model-name">{cfg['icon']} {model_name}</div>
+                        <div class="pred-label">{res['label']}</div>
+                        <div class="confidence-text">Akurasi: <b>{res['confidence']*100:.2f}%</b></div>
+                        <div class="conf-bar-bg">
+                            <div class="conf-bar-fill" style="width:{min(max(res['confidence']*100,0),100):.1f}%; background:{bar_color};"></div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.divider()
+
+        # Grad-CAM Visualisasi
+        st.markdown(
+            '<div class="section-title">🔥 Area Fokus AI (Grad-CAM)</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption("Bagian berwarna **merah/kuning** merupakan fokus utama AI dalam mengambil keputusan.")
+
+        grad_cols = st.columns(len(results))
+        for col, (model_name, res) in zip(grad_cols, results.items()):
+            cfg = MODELS_CONFIG[model_name]
+            with col:
+                if res["gradcam"] is not None:
+                    st.image(
+                        res["gradcam"],
+                        caption=f"Grad-CAM: {model_name}",
+                        use_column_width=True,
+                    )
+                else:
+                    st.warning(f"Grad-CAM tidak tersedia untuk {model_name}")
+
+        st.divider()
+
+        # Detail Probabilitas
+        st.markdown(
+            '<div class="section-title">🔎 Rincian Probabilitas</div>',
+            unsafe_allow_html=True,
+        )
+        for model_name, res in results.items():
+            cfg = MODELS_CONFIG[model_name]
+            with st.expander(
+                f"{cfg['icon']} Probabilitas — {model_name}",
+                expanded=False,
+            ):
+                for i, cname in enumerate(res["class_names"]):
+                    p = float(res["probs"][i]) if i < len(res["probs"]) else 0.0
+                    bar_color = confidence_color(p)
+                    st.markdown(
+                        f"""
+                        <div style="margin-bottom: 8px;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#3A5A4A;">
+                                <span>{cname}</span><span><b>{p*100:.2f}%</b></span>
+                            </div>
+                            <div class="conf-bar-bg">
+                                <div class="conf-bar-fill" style="width:{min(max(p*100,0),100):.1f}%; background:{bar_color};"></div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+else:
+    st.info("💡 Silakan upload file dari galeri, ambil foto dari kamera, atau masukkan link URL.")
